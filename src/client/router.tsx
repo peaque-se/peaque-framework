@@ -252,7 +252,6 @@ export function NavLink({ to, className, children, ...rest }: NavLinkProps) {
 }
 
 export function Router({ routes, fallback = <div>Loading...</div> }: RouterProps): ReactElement {
-  console.log("Router render")
   const [path, setPath] = useState(() => window.location.pathname)
   const [guardState, setGuardState] = useState<{
     status: "pending" | "allowed" | "redirect" | "denied" | "404"

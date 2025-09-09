@@ -12,6 +12,25 @@ const __dirname = path.dirname(__filename);
 
 const command = process.argv[2];
 
+// Parse CLI arguments for flags
+const args = process.argv.slice(3);
+const verbose = args.includes('--verbose') || args.includes('-v');
+
+// Show help if requested
+if (command === 'help' || command === '--help' || command === '-h' || !command) {
+  console.log('Usage: peaque <command> [options]');
+  console.log('');
+  console.log('Commands:');
+  console.log('  dev     Start development server with HMR');
+  console.log('  build   Build the application for production');
+  console.log('  start   Start the production server');
+  console.log('');
+  console.log('Options:');
+  console.log('  -v, --verbose   Enable verbose logging');
+  console.log('  -h, --help      Show this help message');
+  process.exit(0);
+}
+
 async function main() {
   const cwd = process.cwd();
 
@@ -51,7 +70,8 @@ async function main() {
     pagesDir: fs.existsSync(path.join(cwd, 'src', 'pages')) ? path.join(cwd, 'src', 'pages') : path.join(cwd, 'pages'),
     apiDir: fs.existsSync(path.join(cwd, 'src', 'api')) ? path.join(cwd, 'src', 'api') : path.join(cwd, 'api'),
     publicDir: fs.existsSync(path.join(cwd, 'src', 'public')) ? path.join(cwd, 'src', 'public') : path.join(cwd, 'public'),
-    buildDir: path.join(cwd, '.peaque', 'dist')
+    buildDir: path.join(cwd, '.peaque', 'dist'),
+    logger: verbose
   };
 
   const framework = new PeaqueFramework(config);
@@ -82,12 +102,18 @@ async function main() {
       break;
 
     default:
-      console.log('Usage: peaque <command>');
+      console.log('❌ Unknown command:', command);
+      console.log('');
+      console.log('Usage: peaque <command> [options]');
       console.log('');
       console.log('Commands:');
       console.log('  dev     Start development server with HMR');
       console.log('  build   Build the application for production');
       console.log('  start   Start the production server');
+      console.log('');
+      console.log('Options:');
+      console.log('  -v, --verbose   Enable verbose logging');
+      console.log('  -h, --help      Show this help message');
       process.exit(1);
   }
 }

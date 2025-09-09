@@ -13,19 +13,20 @@ export class PeaqueFramework {
   private routeHandlers: Map<string, RouteHandler> = new Map();
 
   constructor(config: FrameworkConfig = {}) {
+    this.isDev = config.dev || false;
+
     this.config = {
       port: config.port || 3000,
       host: config.host || 'localhost',
-      dev: config.dev || false,
+      dev: this.isDev,
       pagesDir: config.pagesDir || './pages',
       apiDir: config.apiDir || './api',
       publicDir: config.publicDir || './public',
-      buildDir: config.buildDir || './dist'
+      buildDir: config.buildDir || './dist',
+      logger: config.logger !== undefined ? config.logger : this.isDev
     };
-
-    this.isDev = this.config.dev;
     this.fastify = Fastify({
-      logger: this.isDev
+      logger: this.config.logger
     });
 
     this.router = new Router();

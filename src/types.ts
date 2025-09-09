@@ -40,6 +40,7 @@ export interface FrameworkConfig {
   apiDir?: string;
   publicDir?: string;
   buildDir?: string;
+  logger?: boolean | object;
 }
 
 export interface BuildResult {
