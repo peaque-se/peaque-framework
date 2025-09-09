@@ -376,12 +376,21 @@ root.render(
     // e.g., about/page.tsx -> AboutPage
     // e.g., about/team/page.tsx -> AboutTeamPage
     // e.g., blog/[post]/page.tsx -> BlogPostPage
+    // e.g., my-folder/page.tsx -> MyFolderPage
     const parts = relativePath
       .replace(/page\.(tsx|jsx|ts|js)$/, '') // Remove page.tsx
       .replace(/\\/g, '/')
       .split('/')
       .filter(Boolean)
-      .map(part => part.replace(/\[([^\]]+)\]/g, '$1').replace(/^\w/, c => c.toUpperCase()));
+      .map(part => {
+        // Handle dynamic routes [param] and convert dashes to camelCase
+        const cleanPart = part.replace(/\[([^\]]+)\]/g, '$1');
+        // Split by dashes and capitalize each segment
+        return cleanPart
+          .split('-')
+          .map(segment => segment.replace(/^\w/, c => c.toUpperCase()))
+          .join('');
+      });
     
     if (parts.length === 0) {
       return 'HomePage';
@@ -395,12 +404,21 @@ root.render(
     // e.g., layout.tsx -> RootLayout
     // e.g., blog/layout.tsx -> BlogLayout
     // e.g., blog/posts/layout.tsx -> BlogPostsLayout
+    // e.g., my-folder/layout.tsx -> MyFolderLayout
     const parts = relativePath
       .replace(/layout\.(tsx|jsx|ts|js)$/, '') // Remove layout.tsx
       .replace(/\\/g, '/')
       .split('/')
       .filter(Boolean)
-      .map(part => part.replace(/\[([^\]]+)\]/g, '$1').replace(/^\w/, c => c.toUpperCase()));
+      .map(part => {
+        // Handle dynamic routes [param] and convert dashes to camelCase
+        const cleanPart = part.replace(/\[([^\]]+)\]/g, '$1');
+        // Split by dashes and capitalize each segment
+        return cleanPart
+          .split('-')
+          .map(segment => segment.replace(/^\w/, c => c.toUpperCase()))
+          .join('');
+      });
     
     if (parts.length === 0) {
       return 'RootLayout';
@@ -414,12 +432,21 @@ root.render(
     // e.g., guard.ts -> RootGuard
     // e.g., blog/guard.ts -> BlogGuard
     // e.g., blog/posts/guard.ts -> BlogPostsGuard
+    // e.g., my-folder/guard.ts -> MyFolderGuard
     const parts = relativePath
       .replace(/guard\.(ts|js)$/, '') // Remove guard.ts
       .replace(/\\/g, '/')
       .split('/')
       .filter(Boolean)
-      .map(part => part.replace(/\[([^\]]+)\]/g, '$1').replace(/^\w/, c => c.toUpperCase()));
+      .map(part => {
+        // Handle dynamic routes [param] and convert dashes to camelCase
+        const cleanPart = part.replace(/\[([^\]]+)\]/g, '$1');
+        // Split by dashes and capitalize each segment
+        return cleanPart
+          .split('-')
+          .map(segment => segment.replace(/^\w/, c => c.toUpperCase()))
+          .join('');
+      });
     
     if (parts.length === 0) {
       return 'RootGuard';
