@@ -51,7 +51,7 @@ export async function importWithTsPaths(
 ) {
   const absWorkingDir = options?.absWorkingDir ?? process.cwd()
   const tsconfig = options?.tsconfig
-  const cacheDir = options?.cacheDir ?? path.join(absWorkingDir, '.peaque-cache', 'bundles')
+  const cacheDir = options?.cacheDir ?? path.join(absWorkingDir, '.peaque', 'bundles')
   const aliasAt = options?.aliasAt ?? path.join(absWorkingDir, 'src')
 
   // Strip query (e.g. ?t=...) for filesystem work; keep it only for cache-busting import
