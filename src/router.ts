@@ -1,5 +1,6 @@
 import { glob } from 'glob';
 import path from 'path';
+import { build } from 'esbuild';
 import { RouteDefinition, RouteHandler, HttpMethod } from './types.js';
 
 export class Router {
@@ -72,26 +73,28 @@ export class Router {
 
   private async loadRouteHandlers(filePath: string): Promise<Record<string, RouteHandler>> {
     try {
-      // Convert file path to file:// URL for ES modules
-      const fileUrl = `file://${filePath.replace(/\\/g, '/')}`;
-
-      // Clear the module cache for this file in development
-      if (process.env.NODE_ENV === 'development') {
-        // For ES modules, we need to delete from the import cache
-        // This is a bit tricky with ES modules, but we can try to delete it
-        try {
-          delete require.cache[filePath];
-          // Also try to delete the URL version
-          if (typeof globalThis !== 'undefined' && (globalThis as any).import) {
-            // This is a workaround for clearing ES module cache
-            // In practice, this might not work perfectly with all bundlers
-          }
-        } catch (cacheError) {
-          // Cache clearing might fail, but that's okay
+      // Use esbuild to transform the module and resolve aliases
+      const result = await build({
+        entryPoints: [filePath],
+        bundle: true,
+        write: false,
+        format: 'esm',
+        platform: 'node',
+        target: 'node18',
+        sourcemap: false,
+        minify: false,
+        external: ['@peaque/framework'], // Don't bundle the framework itself
+        banner: {
+          js: '// Built by Peaque Framework'
         }
-      }
+      });
 
-      const module = await import(fileUrl + '?t=' + Date.now()); // Add timestamp to force reload
+      const code = result.outputFiles[0].text;
+
+      // Create a data URL for the transformed code
+      const dataUrl = `data:text/javascript;base64,${Buffer.from(code).toString('base64')}`;
+
+      const module = await import(dataUrl);
       const handlers: Record<string, RouteHandler> = {};
 
       // Look for HTTP method exports
