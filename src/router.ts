@@ -1,7 +1,7 @@
 import { glob } from 'glob';
 import path from 'path';
-import { build } from 'esbuild';
 import { RouteDefinition, RouteHandler, HttpMethod } from './types.js';
+import { importWithTsPaths } from './route-import.js';
 
 export class Router {
   private routes: RouteDefinition[] = [];
@@ -71,53 +71,14 @@ export class Router {
     return routePath || '/';
   }
 
+
+
   private async loadRouteHandlers(filePath: string): Promise<Record<string, RouteHandler>> {
     try {
-      // Node.js built-in modules that should not be bundled
-      const nodeBuiltins = [
-        'node:fs', 'node:path', 'node:crypto', 'node:os', 'node:http', 'node:https',
-        'node:url', 'node:querystring', 'node:events', 'node:stream', 'node:buffer',
-        'node:util', 'node:zlib', 'node:child_process', 'node:cluster', 'node:dgram',
-        'node:dns', 'node:net', 'node:readline', 'node:repl', 'node:tty', 'node:tls',
-        'node:v8', 'node:vm', 'node:worker_threads', 'node:perf_hooks', 'node:async_hooks',
-        'fs', 'path', 'crypto', 'os', 'http', 'https', 'url', 'querystring', 'events',
-        'stream', 'buffer', 'util', 'zlib', 'child_process', 'cluster', 'dgram', 'dns',
-        'net', 'readline', 'repl', 'tty', 'tls', 'v8', 'vm', 'worker_threads', 'perf_hooks', 'async_hooks'
-      ];
-
-      // Use esbuild to transform the module and resolve aliases
-      const result = await build({
-        entryPoints: [filePath],
-        bundle: true,
-        write: false,
-        format: 'esm',
-        platform: 'node',
-        target: 'node18',
-        sourcemap: false,
-        minify: false,
-        external: ['@peaque/framework', ...nodeBuiltins], // Don't bundle the framework itself or Node.js built-ins
-        banner: {
-          js: '// Built by Peaque Framework'
-        },
-        logLevel: 'silent' // Suppress esbuild output
+      const fileUrl = `file://${filePath.replace(/\\/g, '/')}`;
+      const module = await importWithTsPaths(fileUrl + '?t=' + Date.now(), {
+        absWorkingDir: process.cwd(),
       });
-
-      // Check for build errors
-      if (result.errors.length > 0) {
-        const error = result.errors[0];
-        console.error(`❌ Build error in ${filePath}: ${error.text}`);
-        if (error.location) {
-          console.error(`   at ${error.location.file}:${error.location.line}:${error.location.column}`);
-        }
-        return {};
-      }
-
-      const code = result.outputFiles[0].text;
-
-      // Create a data URL for the transformed code
-      const dataUrl = `data:text/javascript;base64,${Buffer.from(code).toString('base64')}`;
-
-      const module = await import(dataUrl);
       const handlers: Record<string, RouteHandler> = {};
 
       // Look for HTTP method exports
@@ -134,6 +95,8 @@ export class Router {
       // Extract meaningful error information without full code dump
       const errorMessage = error instanceof Error ? error.message : String(error);
       console.error(`❌ Error loading route handlers from ${filePath}: ${errorMessage}`);
+      //error instanceof Error && error.stack && console.error(error.stack);
+      throw error;
       return {};
     }
   }
