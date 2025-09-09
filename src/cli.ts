@@ -5,6 +5,7 @@ import { DevServer } from './dev-server.js';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
+import { config as loadEnv } from 'dotenv';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -13,6 +14,22 @@ const command = process.argv[2];
 
 async function main() {
   const cwd = process.cwd();
+
+  // Load environment variables from .env files
+  const envPath = path.join(cwd, '.env');
+  const envLocalPath = path.join(cwd, '.env.local');
+
+  // Load .env file if it exists
+  if (fs.existsSync(envPath)) {
+    loadEnv({ path: envPath });
+    console.log('📄 Loaded .env file');
+  }
+
+  // Load .env.local file if it exists (overrides .env)
+  if (fs.existsSync(envLocalPath)) {
+    loadEnv({ path: envLocalPath, override: true });
+    console.log('📄 Loaded .env.local file');
+  }
 
   // Check if we're in a Peaque project
   const packageJsonPath = path.join(cwd, 'package.json');

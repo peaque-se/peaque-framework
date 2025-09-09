@@ -76,9 +76,15 @@ export async function importWithTsPaths(
       sourcemap: 'inline',
       tsconfig,
       // Either use native alias...
-      alias: { '@': aliasAt },
+      alias: { 
+        '@': aliasAt,
+        // Ensure React consistency for hooks
+        'react': 'react',
+        'react-dom': 'react-dom'
+      },
       // ...or enable tsconfig paths plugin:
       // plugins: [tsconfigPaths()],
+      external: ['react', 'react-dom'], // Keep React external to use the same instance
       packages: 'external', // leave node_modules external for speed
       logLevel: 'silent',
     })

@@ -1,6 +1,7 @@
 // Main exports for the Peaque framework
 
 export {
+  Router,
   Link,
   NavLink,
   useParams,
@@ -13,6 +14,8 @@ export {
 } from './client/router.js';
 
 export type {
+  Route,
+  RouterProps,
   Guard,
   GuardResult,
   CurrentMatch,

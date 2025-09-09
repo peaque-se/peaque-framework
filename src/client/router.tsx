@@ -1,4 +1,5 @@
-import { createContext, ReactElement, ReactNode, useContext, useEffect, useState, Component } from "react"
+import { createContext, useContext, useEffect, useState, Component } from "react"
+import type { ReactElement, ReactNode } from "react"
 
 export type GuardResult = boolean | string | Promise<boolean | string>
 export type Guard = () => GuardResult
@@ -251,6 +252,7 @@ export function NavLink({ to, className, children, ...rest }: NavLinkProps) {
 }
 
 export function Router({ routes, fallback = <div>Loading...</div> }: RouterProps): ReactElement {
+  console.log("Router render")
   const [path, setPath] = useState(() => window.location.pathname)
   const [guardState, setGuardState] = useState<{
     status: "pending" | "allowed" | "redirect" | "denied" | "404"

@@ -231,7 +231,16 @@ export class PeaqueFramework {
           '.ts': 'ts',
           '.jsx': 'jsx',
           '.js': 'js'
-        }
+        },
+        jsx: 'automatic',
+        jsxImportSource: 'react',
+        alias: {
+          // Ensure consistent React resolution
+          'react': 'react',
+          'react-dom': 'react-dom'
+        },
+        // Deduplicate React to prevent multiple instances
+        conditions: ['react-server']
       });
 
       // Process CSS with Tailwind
@@ -255,7 +264,7 @@ export class PeaqueFramework {
 </head>
 <body>
   <div id="peaque"></div>
-  <script src="/peaque.js"></script>
+  <script type="module" src="/peaque.js"></script>
 </body>
 </html>`;
   }
@@ -325,8 +334,8 @@ export class PeaqueFramework {
     const routeTree = this.buildRouteTree(pageRoutes, layoutComponents, guardFunctions);
     
     // Generate the complete main entry content
-    const frameworkPath = '@peaque/framework/dist/client/router';
-    const content = `import React from 'react';
+    const frameworkPath = '@peaque/framework';
+    const content = `import React, { StrictMode } from 'react';
 import ReactDOM from 'react-dom/client';
 import { Router as ClientRouter } from '${frameworkPath}';
 
@@ -346,9 +355,9 @@ function App() {
 
 const root = ReactDOM.createRoot(document.getElementById('peaque')!);
 root.render(
-  <React.StrictMode>
+  <StrictMode>
     <App />
-  </React.StrictMode>
+  </StrictMode>
 );
 `;
     

@@ -140,6 +140,13 @@ export class DevServer {
         '.ts': 'ts',
         '.jsx': 'jsx',
         '.js': 'js'
+      },
+      jsx: 'automatic',
+      jsxImportSource: 'react',
+      alias: {
+        // Ensure consistent React resolution
+        'react': 'react',
+        'react-dom': 'react-dom'
       }
     });
 
@@ -176,6 +183,13 @@ export class DevServer {
         '.ts': 'ts',
         '.jsx': 'jsx',
         '.js': 'js'
+      },
+      jsx: 'automatic',
+      jsxImportSource: 'react',
+      alias: {
+        // Ensure consistent React resolution
+        'react': 'react',
+        'react-dom': 'react-dom'
       }
     });
 
