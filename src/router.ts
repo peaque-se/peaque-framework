@@ -86,8 +86,19 @@ export class Router {
         external: ['@peaque/framework'], // Don't bundle the framework itself
         banner: {
           js: '// Built by Peaque Framework'
-        }
+        },
+        logLevel: 'silent' // Suppress esbuild output
       });
+
+      // Check for build errors
+      if (result.errors.length > 0) {
+        const error = result.errors[0];
+        console.error(`❌ Build error in ${filePath}: ${error.text}`);
+        if (error.location) {
+          console.error(`   at ${error.location.file}:${error.location.line}:${error.location.column}`);
+        }
+        return {};
+      }
 
       const code = result.outputFiles[0].text;
 
@@ -108,7 +119,9 @@ export class Router {
 
       return handlers;
     } catch (error) {
-      console.error(`❌ Error loading route handlers from ${filePath}:`, error);
+      // Extract meaningful error information without full code dump
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error(`❌ Error loading route handlers from ${filePath}: ${errorMessage}`);
       return {};
     }
   }
