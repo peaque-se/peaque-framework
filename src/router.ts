@@ -73,6 +73,18 @@ export class Router {
 
   private async loadRouteHandlers(filePath: string): Promise<Record<string, RouteHandler>> {
     try {
+      // Node.js built-in modules that should not be bundled
+      const nodeBuiltins = [
+        'node:fs', 'node:path', 'node:crypto', 'node:os', 'node:http', 'node:https',
+        'node:url', 'node:querystring', 'node:events', 'node:stream', 'node:buffer',
+        'node:util', 'node:zlib', 'node:child_process', 'node:cluster', 'node:dgram',
+        'node:dns', 'node:net', 'node:readline', 'node:repl', 'node:tty', 'node:tls',
+        'node:v8', 'node:vm', 'node:worker_threads', 'node:perf_hooks', 'node:async_hooks',
+        'fs', 'path', 'crypto', 'os', 'http', 'https', 'url', 'querystring', 'events',
+        'stream', 'buffer', 'util', 'zlib', 'child_process', 'cluster', 'dgram', 'dns',
+        'net', 'readline', 'repl', 'tty', 'tls', 'v8', 'vm', 'worker_threads', 'perf_hooks', 'async_hooks'
+      ];
+
       // Use esbuild to transform the module and resolve aliases
       const result = await build({
         entryPoints: [filePath],
@@ -83,7 +95,7 @@ export class Router {
         target: 'node18',
         sourcemap: false,
         minify: false,
-        external: ['@peaque/framework'], // Don't bundle the framework itself
+        external: ['@peaque/framework', ...nodeBuiltins], // Don't bundle the framework itself or Node.js built-ins
         banner: {
           js: '// Built by Peaque Framework'
         },
