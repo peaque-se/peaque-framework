@@ -4,6 +4,10 @@ import { FrameworkConfig, PeaqueRequest, PeaqueReply, createPeaqueRequest, creat
 import { TailwindUtils } from './tailwind.js';
 import path from 'path';
 import fs from 'fs';
+import { config } from 'dotenv';
+
+// Load environment variables from .env files
+config();
 
 export class PeaqueFramework {
   private fastify: ReturnType<typeof Fastify>;
@@ -181,6 +185,9 @@ export class PeaqueFramework {
   }
 
   private generateDevHTML(): string {
+    const publicEnvVars = this.getPublicEnvVars();
+    const envScript = this.generateEnvScript(publicEnvVars);
+    
     return `
 <!DOCTYPE html>
 <html lang="en">
@@ -192,6 +199,7 @@ export class PeaqueFramework {
 </head>
 <body>
   <div id="peaque"></div>
+  ${envScript}
   <script type="module" src="/peaque.js"></script>
   <script type="module" src="/hmr-client.js"></script>
 </body>
@@ -269,6 +277,9 @@ export class PeaqueFramework {
   }
 
   private generateProdHTML(): string {
+    const publicEnvVars = this.getPublicEnvVars();
+    const envScript = this.generateEnvScript(publicEnvVars);
+    
     return `
 <!DOCTYPE html>
 <html lang="en">
@@ -280,6 +291,7 @@ export class PeaqueFramework {
 </head>
 <body>
   <div id="peaque"></div>
+  ${envScript}
   <script type="module" src="/peaque.js"></script>
 </body>
 </html>`;
@@ -675,5 +687,27 @@ root.render(
       console.error('❌ CSS processing failed:', error.message);
       throw error;
     }
+  }
+
+  private getPublicEnvVars(): Record<string, string> {
+    const publicEnvVars: Record<string, string> = {};
+    
+    // Collect all environment variables that start with PEAQUE_PUBLIC_
+    for (const [key, value] of Object.entries(process.env)) {
+      if (key.startsWith('PEAQUE_PUBLIC_') && typeof value === 'string') {
+        publicEnvVars[key] = value;
+      }
+    }
+    
+    return publicEnvVars;
+  }
+
+  private generateEnvScript(publicEnvVars: Record<string, string>): string {
+    const envJson = JSON.stringify(publicEnvVars);
+    return `<script>
+window.process = window.process || {};
+window.process.env = window.process.env || {};
+Object.assign(window.process.env, ${envJson});
+</script>`;
   }
 }

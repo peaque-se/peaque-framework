@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, Component } from "react"
+import { createContext, useContext, useEffect, useState, Component, useCallback } from "react"
 import type { ReactElement, ReactNode } from "react"
 
 export type GuardResult = boolean | string | Promise<boolean | string>
@@ -50,13 +50,13 @@ export function useCurrentMatch() {
 export function useNavigate() {
   const match = useCurrentMatch()
   if (!match) throw new Error("useNavigate must be used within a Router")
-  return (path: string) => {
-    let href = match.linkPrefix + path
-    if (href !== "/" && href.endsWith("/")) {
-      href = href.slice(0, -1)
-    }
-    navigate(href)
-  }
+  return useCallback((path: string) => {
+      let href = match.linkPrefix + path
+      if (href !== "/" && href.endsWith("/")) {
+        href = href.slice(0, -1)
+      }
+      navigate(href)
+    }, [match.linkPrefix])
 }
 
 export type SearchParams = {
