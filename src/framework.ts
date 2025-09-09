@@ -325,7 +325,7 @@ export class PeaqueFramework {
     const routeTree = this.buildRouteTree(pageRoutes, layoutComponents, guardFunctions);
     
     // Generate the complete main entry content
-    const frameworkPath = this.config.pagesDir.includes('src') ? '../../framework/dist/client/router' : '../framework/dist/client/router';
+    const frameworkPath = '@peaque/framework/dist/client/router';
     const content = `import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { Router as ClientRouter } from '${frameworkPath}';
