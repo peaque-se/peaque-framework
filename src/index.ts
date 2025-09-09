@@ -32,5 +32,8 @@ export type {
   HttpMethod,
   FrameworkConfig,
   BuildResult,
+  CookieOptions,
 } from './types.js';
+
+export { CookieJar } from './types.js';
 

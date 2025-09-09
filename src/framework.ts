@@ -81,6 +81,21 @@ export class PeaqueFramework {
             const currentHandler = this.routeHandlers.get(routeKey);
             if (currentHandler) {
               await currentHandler(peaqueReq, peaqueReply);
+
+              // Process any cookies set during the request
+              const responseCookies = peaqueReq.cookies.getResponseCookies();
+              for (const [name, { value, options }] of responseCookies) {
+                if (value === '') {
+                  // Clear cookie
+                  peaqueReply.clearCookie(name, options);
+                } else {
+                  // Set cookie
+                  peaqueReply.setCookie(name, value, options);
+                }
+              }
+
+              // Clear the response cookies after processing
+              peaqueReq.cookies.clearResponseCookies();
             } else {
               peaqueReply.code(500).send({ error: 'Handler not found' });
             }
