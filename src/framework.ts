@@ -135,6 +135,20 @@ export class PeaqueFramework {
       });
     }
 
+    // In development mode, serve source files for source maps
+    if (this.isDev) {
+      const projectRoot = path.resolve(this.config.pagesDir, '..');
+      const srcDir = path.join(projectRoot, 'src');
+      if (fs.existsSync(srcDir)) {
+        this.fastify.register(import('@fastify/static'), {
+          root: path.resolve(srcDir),
+          prefix: '/src/',
+          decorateReply: false,
+          wildcard: false
+        });
+      }
+    }
+
     // Serve static files from public directory
     if (fs.existsSync(this.config.publicDir)) {
       this.fastify.register(import('@fastify/static'), {
@@ -234,7 +248,9 @@ export class PeaqueFramework {
         format: 'esm',
         target: 'es2020',
         minify: !this.isDev,
-        sourcemap: this.isDev,
+        sourcemap: true,
+        sourcesContent: true,
+        sourceRoot: this.isDev ? '/' : undefined,
         define: {
           'process.env.NODE_ENV': this.isDev ? '"development"' : '"production"'
         },
@@ -370,11 +386,11 @@ function App() {
 }
 
 const root = ReactDOM.createRoot(document.getElementById('peaque')!);
-root.render(
-  <StrictMode>
-    <App />
-  </StrictMode>
-);
+  root.render(
+    <StrictMode>
+      <App />
+    </StrictMode>
+  );
 `;
     
     return content;

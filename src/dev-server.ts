@@ -132,6 +132,8 @@ export class DevServer {
       format: 'esm',
       target: 'es2020',
       sourcemap: true,
+      sourcesContent: true,
+      sourceRoot: '/',
       define: {
         'process.env.NODE_ENV': '"development"'
       },
@@ -175,6 +177,8 @@ export class DevServer {
       format: 'esm',
       target: 'es2020',
       sourcemap: true,
+      sourcesContent: true,
+      sourceRoot: '/',
       define: {
         'process.env.NODE_ENV': '"development"'
       },

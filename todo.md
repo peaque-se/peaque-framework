@@ -7,6 +7,6 @@
 - [ ] Support custom meta tags and stuff for the header (we want custom icons!)
 - [ ] add a "peaque init" command to create a template project
 - [ ] refactor and clean up all code
-- [ ] stack traces from client code has wrong source and line numbers
+- [x] stack traces from client code has wrong source and line numbers
 - [ ] ensure we can run things in debug mode (and document how)
 
