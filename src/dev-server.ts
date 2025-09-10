@@ -130,38 +130,49 @@ export class DevServer {
     await this.buildHMRClient();
 
     // Initial build
-    const result = await build({
-      entryPoints: [
-        mainEntryPath
-      ],
-      bundle: true,
-      outfile: path.join(config.buildDir, 'dev', 'peaque.js'),
-      format: 'esm',
-      target: 'es2020',
-      sourcemap: true,
-      sourcesContent: true,
-      sourceRoot: '/',
-      metafile: true,
-      define: {
-        'process.env.NODE_ENV': '"development"'
-      },
-      loader: {
-        '.tsx': 'tsx',
-        '.ts': 'ts',
-        '.jsx': 'jsx',
-        '.js': 'js'
-      },
-      jsx: 'automatic',
-      jsxImportSource: 'react',
-      alias: {
-        // Ensure consistent React resolution
-        'react': 'react',
-        'react-dom': 'react-dom'
-      }
-    });
+    try {
+      const result = await build({
+        entryPoints: [
+          mainEntryPath
+        ],
+        bundle: true,
+        outfile: path.join(config.buildDir, 'dev', 'peaque.js'),
+        format: 'esm',
+        target: 'es2020',
+        sourcemap: true,
+        sourcesContent: true,
+        sourceRoot: '/',
+        metafile: true,
+        define: {
+          'process.env.NODE_ENV': '"development"'
+        },
+        loader: {
+          '.tsx': 'tsx',
+          '.ts': 'ts',
+          '.jsx': 'jsx',
+          '.js': 'js'
+        },
+        jsx: 'automatic',
+        jsxImportSource: 'react',
+        alias: {
+          // Ensure consistent React resolution
+          'react': 'react',
+          'react-dom': 'react-dom'
+        }
+      });
 
-    // Update watched dependencies based on build metafile
-    this.updateWatchedDependencies(result.metafile);
+      // Update watched dependencies based on build metafile
+      this.updateWatchedDependencies(result.metafile);
+    } catch (error: any) {
+      console.error('❌ Initial build failed:', error.message);
+      if (error.errors) {
+        error.errors.forEach((err: any) => {
+          console.error(`  ${err.location?.file}:${err.location?.line}:${err.location?.column}: ${err.text}`);
+        });
+      }
+      // Don't throw - let the dev server continue running
+      console.log('🔄 Dev server will continue running. Fix the errors and save to rebuild.');
+    }
 
     // Process CSS with Tailwind
     await this.processDevCSS();
@@ -179,38 +190,56 @@ export class DevServer {
     fs.writeFileSync(mainEntryPath, mainEntryContent);
 
     // Rebuild the application
-    const result = await build({
-      entryPoints: [
-        mainEntryPath
-      ],
-      bundle: true,
-      outfile: path.join(config.buildDir, 'dev', 'peaque.js'),
-      format: 'esm',
-      target: 'es2020',
-      sourcemap: true,
-      sourcesContent: true,
-      sourceRoot: '/',
-      metafile: true,
-      define: {
-        'process.env.NODE_ENV': '"development"'
-      },
-      loader: {
-        '.tsx': 'tsx',
-        '.ts': 'ts',
-        '.jsx': 'jsx',
-        '.js': 'js'
-      },
-      jsx: 'automatic',
-      jsxImportSource: 'react',
-      alias: {
-        // Ensure consistent React resolution
-        'react': 'react',
-        'react-dom': 'react-dom'
-      }
-    });
+    try {
+      const result = await build({
+        entryPoints: [
+          mainEntryPath
+        ],
+        bundle: true,
+        outfile: path.join(config.buildDir, 'dev', 'peaque.js'),
+        format: 'esm',
+        target: 'es2020',
+        sourcemap: true,
+        sourcesContent: true,
+        sourceRoot: '/',
+        metafile: true,
+        define: {
+          'process.env.NODE_ENV': '"development"'
+        },
+        loader: {
+          '.tsx': 'tsx',
+          '.ts': 'ts',
+          '.jsx': 'jsx',
+          '.js': 'js'
+        },
+        jsx: 'automatic',
+        jsxImportSource: 'react',
+        alias: {
+          // Ensure consistent React resolution
+          'react': 'react',
+          'react-dom': 'react-dom'
+        }
+      });
 
-    // Update watched dependencies based on build metafile
-    this.updateWatchedDependencies(result.metafile);
+      // Update watched dependencies based on build metafile
+      this.updateWatchedDependencies(result.metafile);
+      console.log('✅ Application rebuilt successfully');
+    } catch (error: any) {
+      console.error('❌ Rebuild failed:', error.message);
+      if (error.errors) {
+        error.errors.forEach((err: any) => {
+          console.error(`  ${err.location?.file}:${err.location?.line}:${err.location?.column}: ${err.text}`);
+        });
+      }
+      // Don't throw - let the dev server continue running
+      console.log('🔄 Fix the errors and save again to retry.');
+      
+      // Notify clients about the build failure
+      this.notifyClients('build-error', { 
+        message: error.message,
+        errors: error.errors || []
+      });
+    }
 
   }
 

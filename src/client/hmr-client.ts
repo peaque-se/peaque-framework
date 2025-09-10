@@ -33,6 +33,9 @@ class HMRClient {
           case 'api-update':
             this.handleAPIUpdate(message.data);
             break;
+          case 'build-error':
+            this.handleBuildError(message.data);
+            break;
           case 'update':
             this.handleUpdate(message.data);
             break;
@@ -89,6 +92,16 @@ class HMRClient {
 
   private handleAPIUpdate(data: any): void {
     // API updates don't require client action, just log it
+  }
+
+  private handleBuildError(data: any): void {
+    console.error('🚨 Build Error:', data.message);
+    if (data.errors && data.errors.length > 0) {
+      data.errors.forEach((error: any) => {
+        console.error(`  ${error.location?.file}:${error.location?.line}:${error.location?.column}: ${error.text}`);
+      });
+    }
+    // Could show an overlay or notification in the future
   }
 }
 
