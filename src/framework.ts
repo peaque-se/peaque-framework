@@ -1,12 +1,12 @@
-import Fastify from 'fastify';
-import { Router } from './router.js';
-import { RouteHandler } from './public-types.js';
-import { TailwindUtils } from './tailwind.js';
-import path from 'path';
-import fs from 'fs';
 import { config } from 'dotenv';
+import Fastify from 'fastify';
+import fs from 'fs';
+import path from 'path';
 import { FrameworkConfig } from './api-router.js';
 import { createPeaqueRequestFromFastify, writePeaqueRequestToFastify } from './fastify.js';
+import { RouteHandler } from './public-types.js';
+import { Router } from './router.js';
+import { TailwindUtils } from './tailwind.js';
 
 // Load environment variables from .env files
 config();
@@ -17,8 +17,10 @@ export class PeaqueFramework {
   private config: Required<FrameworkConfig>;
   private isDev: boolean;
   private routeHandlers: Map<string, RouteHandler> = new Map();
+  private t0: number;
 
   constructor(config: FrameworkConfig = {}) {
+    this.t0 = Date.now();
     this.isDev = config.dev || false;
 
     this.config = {
@@ -57,7 +59,7 @@ export class PeaqueFramework {
         host: this.config.host
       });
 
-      console.log(`🚀 Peaque server running on http://${this.config.host}:${this.config.port}`);
+      console.log(`🚀 Peaque server running on http://${this.config.host}:${this.config.port} after ${(Date.now() - this.t0).toLocaleString()} ms`);
     } catch (error) {
       console.error('Failed to start server:', error);
       process.exit(1);
@@ -165,8 +167,8 @@ export class PeaqueFramework {
     this.fastify.setNotFoundHandler(async (request: any, reply: any) => {
       // Don't serve HTML for API routes, static files, or assets
       if (request.url.startsWith('/api/') ||
-          request.url.includes('.') || // static files have extensions
-          request.url.startsWith('/assets/')) {
+        request.url.includes('.') || // static files have extensions
+        request.url.startsWith('/assets/')) {
         return reply.code(404).send('Not found');
       }
 
@@ -189,7 +191,7 @@ export class PeaqueFramework {
   private generateDevHTML(): string {
     const publicEnvVars = this.getPublicEnvVars();
     const envScript = this.generateEnvScript(publicEnvVars);
-    
+
     return `
 <!DOCTYPE html>
 <html lang="en">
@@ -283,7 +285,7 @@ export class PeaqueFramework {
   private generateProdHTML(): string {
     const publicEnvVars = this.getPublicEnvVars();
     const envScript = this.generateEnvScript(publicEnvVars);
-    
+
     return `
 <!DOCTYPE html>
 <html lang="en">
@@ -303,68 +305,68 @@ export class PeaqueFramework {
 
   async generateMainEntry(): Promise<string> {
     const router = this.router;
-    
+
     // Discover all page files, layouts, and guards
     const pageFiles = await router.discoverPages(this.config.pagesDir);
     const layoutFiles = await router.discoverLayouts(this.config.pagesDir);
     const guardFiles = await router.discoverGuards(this.config.pagesDir);
-    
+
     // Generate imports
     const staticImports: string[] = [];
     const layoutComponents: Map<string, string> = new Map();
     const guardFunctions: Map<string, string> = new Map();
-    
+
     // Process layout files
     for (const layoutFile of layoutFiles) {
       const relativePath = path.relative(this.config.pagesDir, layoutFile);
       const layoutName = this.layoutFileToComponentName(relativePath);
       const pagesPrefix = this.config.pagesDir.includes('src') ? '../src/pages/' : '../pages/';
       const importPath = pagesPrefix + relativePath.replace(/\\/g, '/').replace(/\.tsx?$/, '');
-      
+
       staticImports.push(`import ${layoutName} from '${importPath}';`);
-      
+
       // Map directory path to layout component name
       const layoutDir = path.dirname(relativePath).replace(/\\/g, '/');
       layoutComponents.set(layoutDir === '.' ? '' : layoutDir, layoutName);
     }
-    
+
     // Process guard files
     for (const guardFile of guardFiles) {
       const relativePath = path.relative(this.config.pagesDir, guardFile);
       const guardName = this.guardFileToFunctionName(relativePath);
       const pagesPrefix = this.config.pagesDir.includes('src') ? '../src/pages/' : '../pages/';
       const importPath = pagesPrefix + relativePath.replace(/\\/g, '/').replace(/\.tsx?$/, '');
-      
+
       // Import the GUARD function from the guard.ts file
       staticImports.push(`import { GUARD as ${guardName} } from '${importPath}';`);
-      
+
       // Map directory path to guard function name
       const guardDir = path.dirname(relativePath).replace(/\\/g, '/');
       guardFunctions.set(guardDir === '.' ? '' : guardDir, guardName);
     }
-    
+
     // Process page files and build route structure
     const pageRoutes: Map<string, any> = new Map();
     for (const pageFile of pageFiles) {
       const relativePath = path.relative(this.config.pagesDir, pageFile);
       const routePath = this.pageFileToRoutePath(relativePath);
       const componentName = this.pageFileToComponentName(relativePath);
-      
+
       // Generate static import for page
       const pagesPrefix = this.config.pagesDir.includes('src') ? '../src/pages/' : '../pages/';
       const importPath = pagesPrefix + relativePath.replace(/\\/g, '/').replace(/\.tsx?$/, '');
       staticImports.push(`import ${componentName} from '${importPath}';`);
-      
+
       pageRoutes.set(routePath, {
         path: routePath,
         component: componentName,
         pageDir: path.dirname(relativePath).replace(/\\/g, '/')
       });
     }
-    
+
     // Build hierarchical route structure with layouts and guards
     const routeTree = this.buildRouteTree(pageRoutes, layoutComponents, guardFunctions);
-    
+
     // Generate the complete main entry content
     const frameworkPath = '@peaque/framework';
     const content = `import React, { StrictMode } from 'react';
@@ -392,7 +394,7 @@ const root = ReactDOM.createRoot(document.getElementById('peaque')!);
     </StrictMode>
   );
 `;
-    
+
     return content;
   }
 
@@ -407,7 +409,7 @@ const root = ReactDOM.createRoot(document.getElementById('peaque')!);
       .replace(/\\/g, '/') // Normalize separators
       .replace(/\[([^\]]+)\]/g, ':$1') // Convert [param] to :param
       .replace(/\/$/, ''); // Remove trailing slash
-    
+
     return routePath || '/';
   }
 
@@ -432,11 +434,11 @@ const root = ReactDOM.createRoot(document.getElementById('peaque')!);
           .map(segment => segment.replace(/^\w/, c => c.toUpperCase()))
           .join('');
       });
-    
+
     if (parts.length === 0) {
       return 'HomePage';
     }
-    
+
     return parts.join('') + 'Page';
   }
 
@@ -460,11 +462,11 @@ const root = ReactDOM.createRoot(document.getElementById('peaque')!);
           .map(segment => segment.replace(/^\w/, c => c.toUpperCase()))
           .join('');
       });
-    
+
     if (parts.length === 0) {
       return 'RootLayout';
     }
-    
+
     return parts.join('') + 'Layout';
   }
 
@@ -488,30 +490,30 @@ const root = ReactDOM.createRoot(document.getElementById('peaque')!);
           .map(segment => segment.replace(/^\w/, c => c.toUpperCase()))
           .join('');
       });
-    
+
     if (parts.length === 0) {
       return 'RootGuard';
     }
-    
+
     return parts.join('') + 'Guard';
   }
 
   private buildRouteTree(pageRoutes: Map<string, any>, layoutComponents: Map<string, string>, guardFunctions: Map<string, string>): any[] {
     const routeTree: any[] = [];
     const rootLayout = layoutComponents.get('');
-    
+
     if (rootLayout) {
       // All routes should be under the root layout
       const rootLayoutRoute = {
         layout: rootLayout,
         children: [] as any[]
       };
-      
+
       // Build the nested structure for all routes under root layout
       for (const [routePath, route] of pageRoutes) {
         this.addRouteToNestedTree(rootLayoutRoute.children, routePath, route, layoutComponents, guardFunctions);
       }
-      
+
       routeTree.push(rootLayoutRoute);
     } else {
       // No root layout - build flat structure
@@ -519,17 +521,17 @@ const root = ReactDOM.createRoot(document.getElementById('peaque')!);
         this.addRouteToNestedTree(routeTree, routePath, route, layoutComponents, guardFunctions);
       }
     }
-    
+
     return routeTree;
   }
-  
+
   private addRouteToNestedTree(tree: any[], routePath: string, route: any, layoutComponents: Map<string, string>, guardFunctions: Map<string, string>): void {
     const pageDir = route.pageDir;
-    
+
     // Find the closest layout for this page by checking parent directories
     let closestLayout = null;
     let closestLayoutPath = '';
-    
+
     // Check the page's directory and all parent directories for layouts
     const pathParts = pageDir === '.' ? [] : pageDir.split('/');
     for (let i = pathParts.length; i >= 0; i--) {
@@ -540,28 +542,28 @@ const root = ReactDOM.createRoot(document.getElementById('peaque')!);
         break;
       }
     }
-    
+
     // Find the guard for this page by checking the page's directory
     let pageGuard = null;
     if (guardFunctions.has(pageDir)) {
       pageGuard = guardFunctions.get(pageDir);
     }
-    
+
     const pageRoute: any = {
       path: routePath,
       component: route.component
     };
-    
+
     // Add guard to the route if found
     if (pageGuard) {
       pageRoute.guard = pageGuard;
     }
-    
+
     if (closestLayout) {
       // This page belongs under a specific layout
       // Find or create the layout route in the tree
       let layoutRoute = tree.find(r => r.layout === closestLayout);
-      
+
       if (!layoutRoute) {
         layoutRoute = {
           layout: closestLayout,
@@ -569,7 +571,7 @@ const root = ReactDOM.createRoot(document.getElementById('peaque')!);
         };
         tree.push(layoutRoute);
       }
-      
+
       // Add the page under this layout
       layoutRoute.children.push(pageRoute);
     } else {
@@ -582,33 +584,33 @@ const root = ReactDOM.createRoot(document.getElementById('peaque')!);
     const formatRoute = (route: any, indent = 4): string => {
       const spaces = ' '.repeat(indent);
       let result = '{\n';
-      
+
       if (route.path) {
         result += `${spaces}  path: '${route.path}',\n`;
       }
-      
+
       if (route.component) {
         result += `${spaces}  component: ${route.component},\n`;
       }
-      
+
       if (route.layout) {
         result += `${spaces}  layout: ${route.layout},\n`;
       }
-      
+
       if (route.guard) {
         result += `${spaces}  guard: ${route.guard},\n`;
       }
-      
+
       if (route.children && route.children.length > 0) {
         result += `${spaces}  children: [\n`;
         result += route.children.map((child: any) => formatRoute(child, indent + 4)).join(',\n');
         result += `\n${spaces}  ]\n`;
       }
-      
+
       result += `${spaces}}`;
       return result;
     };
-    
+
     return '[\n' + routeTree.map(route => formatRoute(route, 4)).join(',\n') + '\n  ]';
   }
 
@@ -671,14 +673,14 @@ const root = ReactDOM.createRoot(document.getElementById('peaque')!);
 
   private getPublicEnvVars(): Record<string, string> {
     const publicEnvVars: Record<string, string> = {};
-    
+
     // Collect all environment variables that start with PEAQUE_PUBLIC_
     for (const [key, value] of Object.entries(process.env)) {
       if (key.startsWith('PEAQUE_PUBLIC_') && typeof value === 'string') {
         publicEnvVars[key] = value;
       }
     }
-    
+
     return publicEnvVars;
   }
 

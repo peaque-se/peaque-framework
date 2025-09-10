@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 
-import { PeaqueFramework } from './framework.js';
-import { DevServer } from './dev-server.js';
-import path from 'path';
-import fs from 'fs';
-import { fileURLToPath } from 'url';
 import { config as loadEnv } from 'dotenv';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { DevServer } from './dev-server.js';
+import { PeaqueFramework } from './framework.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -31,8 +31,9 @@ if (command === 'help' || command === '--help' || command === '-h' || !command) 
   process.exit(0);
 }
 
-async function main() {
+function makeFramework(): PeaqueFramework {
   const cwd = process.cwd();
+  const t0 = Date.now()
 
   // Load environment variables from .env files
   const envPath = path.join(cwd, '.env');
@@ -50,6 +51,23 @@ async function main() {
     console.log('📄 Loaded .env.local file');
   }
 
+  const config = {
+    port: parseInt(process.env.PORT || '3000'),
+    host: process.env.HOST || 'localhost',
+    dev: command === 'dev',
+    pagesDir: fs.existsSync(path.join(cwd, 'src', 'pages')) ? path.join(cwd, 'src', 'pages') : path.join(cwd, 'pages'),
+    apiDir: fs.existsSync(path.join(cwd, 'src', 'api')) ? path.join(cwd, 'src', 'api') : path.join(cwd, 'api'),
+    publicDir: fs.existsSync(path.join(cwd, 'src', 'public')) ? path.join(cwd, 'src', 'public') : path.join(cwd, 'public'),
+    buildDir: path.join(cwd, '.peaque', 'dist'),
+    logger: verbose
+  };
+
+  return new PeaqueFramework(config);
+}
+
+async function main() {
+  const cwd = process.cwd();
+
   // Check if we're in a Peaque project
   const packageJsonPath = path.join(cwd, 'package.json');
   if (!fs.existsSync(packageJsonPath)) {
@@ -63,29 +81,18 @@ async function main() {
     process.exit(1);
   }
 
-  const config = {
-    port: parseInt(process.env.PORT || '3000'),
-    host: process.env.HOST || 'localhost',
-    dev: command === 'dev',
-    pagesDir: fs.existsSync(path.join(cwd, 'src', 'pages')) ? path.join(cwd, 'src', 'pages') : path.join(cwd, 'pages'),
-    apiDir: fs.existsSync(path.join(cwd, 'src', 'api')) ? path.join(cwd, 'src', 'api') : path.join(cwd, 'api'),
-    publicDir: fs.existsSync(path.join(cwd, 'src', 'public')) ? path.join(cwd, 'src', 'public') : path.join(cwd, 'public'),
-    buildDir: path.join(cwd, '.peaque', 'dist'),
-    logger: verbose
-  };
-
-  const framework = new PeaqueFramework(config);
-
   switch (command) {
     case 'dev':
       console.log('🚀 Starting Peaque in development mode...');
-      const devServer = new DevServer(framework);
+      const devFramework = makeFramework();
+      const devServer = new DevServer(devFramework);
       await devServer.start();
-      await framework.start();
+      await devFramework.start();
       break;
 
     case 'build':
       console.log('🔨 Building Peaque application...');
+      const framework = makeFramework();
       const result = await framework.build();
       if (result.success) {
         console.log('✅ Build completed successfully');
@@ -98,7 +105,7 @@ async function main() {
 
     case 'start':
       console.log('🚀 Starting Peaque in production mode...');
-      await framework.start();
+      await makeFramework().start();
       break;
 
     default:
