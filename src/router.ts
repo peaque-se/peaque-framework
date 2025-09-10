@@ -1,7 +1,8 @@
 import { glob } from 'glob';
 import path from 'path';
-import { RouteDefinition, RouteHandler, HttpMethod } from './types.js';
+import { RouteHandler, HttpMethod } from './public-types.js';
 import { importWithTsPaths } from './route-import.js';
+import { RouteDefinition } from './api-router.js';
 
 export class Router {
   private routes: RouteDefinition[] = [];

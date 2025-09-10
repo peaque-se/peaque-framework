@@ -1,10 +1,12 @@
 import Fastify from 'fastify';
 import { Router } from './router.js';
-import { FrameworkConfig, PeaqueRequest, PeaqueReply, createPeaqueRequest, createPeaqueReply, RouteHandler } from './types.js';
+import { RouteHandler } from './public-types.js';
 import { TailwindUtils } from './tailwind.js';
 import path from 'path';
 import fs from 'fs';
 import { config } from 'dotenv';
+import { FrameworkConfig } from './api-router.js';
+import { createPeaqueRequestFromFastify, writePeaqueRequestToFastify } from './fastify.js';
 
 // Load environment variables from .env files
 config();
@@ -76,37 +78,23 @@ export class PeaqueFramework {
         method: route.method,
         url: route.path,
         handler: async (fastifyReq: any, fastifyReply: any) => {
-          const peaqueReq = createPeaqueRequest(fastifyReq);
-          const peaqueReply = createPeaqueReply(fastifyReply);
+          const peaqueRequest = createPeaqueRequestFromFastify(fastifyReq);
 
           try {
 
             // Get the current handler (may have been updated via HMR)
             const currentHandler = this.routeHandlers.get(routeKey);
             if (currentHandler) {
-              await currentHandler(peaqueReq, peaqueReply);
-
-              // Process any cookies set during the request
-              const responseCookies = peaqueReq.cookies.getResponseCookies();
-              for (const [name, { value, options }] of responseCookies) {
-                if (value === '') {
-                  // Clear cookie
-                  peaqueReply.clearCookie(name, options);
-                } else {
-                  // Set cookie
-                  peaqueReply.setCookie(name, value, options);
-                }
-              }
-
-              // Clear the response cookies after processing
-              peaqueReq.cookies.clearResponseCookies();
+              await currentHandler(peaqueRequest);
             } else {
-              peaqueReply.code(500).send({ error: 'Handler not found' });
+              peaqueRequest.code(500).send({ error: 'Handler not found' });
             }
           } catch (error) {
             console.error(`❌ Error in ${route.method} ${route.path}:`, error);
-            peaqueReply.code(500).send({ error: 'Internal server error' });
+            peaqueRequest.code(500).send({ error: 'Internal server error' });
           }
+
+          writePeaqueRequestToFastify(peaqueRequest, fastifyReply);
         }
       });
     }

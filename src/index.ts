@@ -1,5 +1,4 @@
 // Main exports for the Peaque framework
-
 export {
   Router,
   Link,
@@ -26,14 +25,10 @@ export type {
 // API Router Types
 export type {
   PeaqueRequest,
-  PeaqueReply,
   RouteHandler,
-  RouteDefinition,
   HttpMethod,
-  FrameworkConfig,
-  BuildResult,
   CookieOptions,
-} from './types.js';
+  CookieJar,
+} from './public-types.js';
 
-export { CookieJar } from './types.js';
 
