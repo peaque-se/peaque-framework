@@ -11,6 +11,7 @@ Peaque is a modern, full-stack TypeScript web framework that combines the simpli
 - Automatic Tailwind CSS configuration
 - Built-in TypeScript support
 - Smart project structure detection
+- Environment variable loading with `.env` support
 
 ### 📁 **File-Based Routing**
 - **Pages**: Create routes by adding `page.tsx` files in folders
@@ -24,6 +25,7 @@ Peaque is a modern, full-stack TypeScript web framework that combines the simpli
 - **Fast Builds**: Powered by esbuild for lightning-fast compilation
 - **Live Reloading**: Automatic page updates on file changes
 - **Error Handling**: Clear error messages and stack traces
+- **Verbose Logging**: Enhanced CLI output for debugging
 
 ### 🎨 **Built-in Styling**
 - **Tailwind CSS**: Utility-first CSS framework included by default
@@ -36,6 +38,11 @@ Peaque is a modern, full-stack TypeScript web framework that combines the simpli
 - **Nested Guards**: Hierarchical protection with layout inheritance
 - **Flexible Logic**: Custom guard functions with full TypeScript support
 
+### 🍪 **Cookie Management**
+- **Built-in Cookie Handlers**: GET and POST methods for cookie operations
+- **Secure Cookie Support**: HTTP-only and secure cookie options
+- **TypeScript Integration**: Full type safety for cookie operations
+
 ### 🏗️ **Production Ready**
 - **Optimized Builds**: Minified and tree-shaken production bundles
 - **Static Generation**: Pre-built assets for fast loading
@@ -47,8 +54,10 @@ Peaque is a modern, full-stack TypeScript web framework that combines the simpli
 ### Installation
 
 ```bash
-npm install @peaque/framework
+npm install @peaque/framework@latest
 ```
+
+**Current Version**: 1.1.0
 
 ### Project Structure
 
@@ -182,7 +191,7 @@ import { PeaqueRequest } from '@peaque/framework';
 
 export function GUARD(request: PeaqueRequest): boolean | Promise<boolean> {
   // Check authentication
-  const token = request.headers.authorization;
+  const token = request.requestHeader('authorization');
   
   if (!token) {
     // Redirect to login or show error
@@ -205,23 +214,23 @@ Create backend APIs with HTTP method exports:
 
 ```typescript
 // api/users/route.ts
-import { PeaqueRequest, PeaqueReply } from '@peaque/framework';
+import { PeaqueRequest } from '@peaque/framework';
 
-export async function GET(request: PeaqueRequest, reply: PeaqueReply) {
+export async function GET(request: PeaqueRequest) {
   const users = await getUsersFromDatabase();
-  reply.send({ users });
+  request.send({ users });
 }
 
-export async function POST(request: PeaqueRequest, reply: PeaqueReply) {
-  const userData = request.body;
+export async function POST(request: PeaqueRequest) {
+  const userData = request.body();
   const newUser = await createUser(userData);
-  reply.code(201).send({ user: newUser });
+  request.code(201).send({ user: newUser });
 }
 
-export async function DELETE(request: PeaqueRequest, reply: PeaqueReply) {
-  const { id } = request.params;
+export async function DELETE(request: PeaqueRequest) {
+  const { id } = request.param('id');
   await deleteUser(id);
-  reply.code(204).send();
+  request.code(204).send();
 }
 ```
 
@@ -229,26 +238,52 @@ export async function DELETE(request: PeaqueRequest, reply: PeaqueReply) {
 
 ```typescript
 // api/posts/[id]/route.ts
-import { PeaqueRequest, PeaqueReply } from '@peaque/framework';
+import { PeaqueRequest } from '@peaque/framework';
 
-export async function GET(request: PeaqueRequest, reply: PeaqueReply) {
-  const { id } = request.params;
+export async function GET(request: PeaqueRequest) {
+  const id = request.pathParam('id');
   const post = await getPostById(id);
   
   if (!post) {
-    reply.code(404).send({ error: 'Post not found' });
+    request.code(404).send({ error: 'Post not found' });
     return;
   }
   
-  reply.send({ post });
+  request.send({ post });
 }
 
-export async function PUT(request: PeaqueRequest, reply: PeaqueReply) {
-  const { id } = request.params;
-  const updateData = request.body;
+export async function PUT(request: PeaqueRequest) {
+  const id = request.pathParam('id');
+  const updateData = request.body();
   
   const updatedPost = await updatePost(id, updateData);
-  reply.send({ post: updatedPost });
+  request.send({ post: updatedPost });
+}
+```
+
+### Cookie Management
+
+Peaque provides built-in cookie management with GET and POST handlers:
+
+```typescript
+// api/auth/cookies/route.ts
+import { PeaqueRequest } from '@peaque/framework';
+
+export async function GET(request: PeaqueRequest) {
+  // Get all cookies
+  const cookies = request.cookies().getAll();
+  request.send({ cookies });
+}
+
+export async function POST(request: PeaqueRequest) {
+  // Set a cookie
+  request.cookies().set('session', 'abc123', {
+    httpOnly: true,
+    secure: true,
+    maxAge: 86400 // 24 hours
+  });
+  
+  request.send({ success: true });
 }
 ```
 
@@ -277,63 +312,24 @@ export default function StyledPage() {
 }
 ```
 
-### Custom Tailwind Configuration
-
-Override defaults with your own `tailwind.config.js`:
-
-```javascript
-/** @type {import('tailwindcss').Config} */
-module.exports = {
-  content: [
-    "./pages/**/*.{js,ts,jsx,tsx}",
-    "./components/**/*.{js,ts,jsx,tsx}",
-  ],
-  theme: {
-    extend: {
-      colors: {
-        brand: {
-          50: '#eff6ff',
-          500: '#3b82f6',
-          900: '#1e3a8a',
-        }
-      }
-    },
-  },
-  plugins: [],
-}
-```
-
 ## 🔧 Configuration
 
 Peaque works out of the box, but you can customize it:
 
 ### Environment Variables
 
+Create a `.env` file in your project root for environment variables:
+
 ```bash
 # .env
 PORT=3000
 HOST=localhost
 NODE_ENV=development
+PEAQUE_PUBLIC_API_URL=https://api.example.com
 ```
 
-### TypeScript Configuration
+Peaque automatically loads environment variables from `.env` files and makes `PEAQUE_PUBLIC_*` variables available on the client side.
 
-Peaque respects your `tsconfig.json`:
-
-```json
-{
-  "compilerOptions": {
-    "target": "ES2020",
-    "module": "ESNext",
-    "moduleResolution": "node",
-    "jsx": "react-jsx",
-    "strict": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true
-  },
-  "include": ["pages/**/*", "api/**/*", "components/**/*"]
-}
 ```
 
 ## 🚀 Deployment
@@ -355,24 +351,25 @@ This generates optimized assets in `.peaque/dist/`:
 peaque start
 ```
 
-### Deploy to Vercel, Netlify, etc.
-
-The framework generates static assets that can be deployed anywhere:
-
-1. Run `peaque build`
-2. Upload the `.peaque/dist/` folder
-3. Configure your host to serve `index.html` for all routes
-
 ## 🤝 Contributing
 
 We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
 
 ## 📄 License
 
-MIT © Peaque Framework
+MIT © 2025 Peaque Framework
 
 ---
 
 **Built with ❤️ by the Peaque team**
 
 *The last JavaScript framework ever to be needed.*
+
+---
+
+**Recent Updates (v1.1.0)**:
+- ✨ Added dotenv support for environment variables
+- 🍪 Implemented built-in cookie management
+- 🔧 Enhanced CLI with verbose logging
+- 📦 Updated to React 19 and latest dependencies
+- 🛠️ Improved module resolution and TypeScript path support
