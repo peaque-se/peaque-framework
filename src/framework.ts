@@ -710,6 +710,11 @@ Object.assign(window.process.env, ${envJson});
       // Generate or find tsconfig.json
       const tsconfigPath = await this.generateTsconfigForTypeChecking(projectRoot, mainEntryPath);
 
+      if (tsconfigPath === '') {
+        // No tsconfig found or generated, skip type checking
+        return { success: true };
+      }
+
       // Read and parse tsconfig.json
       const configFileResult = ts.readConfigFile(tsconfigPath, ts.sys.readFile);
       if (configFileResult.error) {
@@ -775,71 +780,15 @@ Object.assign(window.process.env, ${envJson});
   }
 
   private async generateTsconfigForTypeChecking(projectRoot: string, mainEntryPath: string): Promise<string> {
-    const userTsconfigPath = path.join(projectRoot, 'tsconfig.json');
+    const userTsconfigPath = path.join(projectRoot, '..', 'tsconfig.json');
 
     // If user has their own tsconfig.json, use it
     if (fs.existsSync(userTsconfigPath)) {
       return userTsconfigPath;
+    } else {
+      console.log('⚠️  No tsconfig.json found, skipping type checking');
+      return Promise.resolve('');
     }
-
-    // Generate a temporary tsconfig.json for type checking in the project root
-    const tempTsconfigPath = path.join(projectRoot, '.peaque-tsconfig.json');
-
-    // Determine which directories exist to include
-    const includePaths: string[] = [];
-
-    // Check for pages directory structure
-    if (fs.existsSync(path.join(projectRoot, 'pages'))) {
-      includePaths.push("pages/**/*");
-    }
-    if (fs.existsSync(path.join(projectRoot, 'src', 'pages'))) {
-      includePaths.push("src/pages/**/*");
-    }
-
-    // Check for API directory structure  
-    if (fs.existsSync(path.join(projectRoot, 'api'))) {
-      includePaths.push("api/**/*");
-    }
-    if (fs.existsSync(path.join(projectRoot, 'src', 'api'))) {
-      includePaths.push("src/api/**/*");
-    }
-
-    // Always include the generated main entry
-    includePaths.push(".peaque/_generated_main.tsx");
-
-    const tsconfigContent = {
-      compilerOptions: {
-        target: "ES2020",
-        module: "ES2020",
-        lib: ["ES2020", "DOM", "DOM.Iterable"],
-        allowJs: true,
-        skipLibCheck: true,
-        esModuleInterop: true,
-        allowSyntheticDefaultImports: true,
-        strict: true,
-        forceConsistentCasingInFileNames: true,
-        moduleResolution: "bundler",
-        resolveJsonModule: true,
-        isolatedModules: true,
-        noEmit: true,
-        jsx: "react-jsx",
-        jsxImportSource: "react",
-        types: ["node", "react", "react-dom"],
-        baseUrl: ".",
-        paths: {
-          "@peaque/framework": ["node_modules/@peaque/framework/dist/index.d.ts"]
-        }
-      },
-      include: includePaths,
-      exclude: [
-        "node_modules",
-        ".peaque/dist"
-      ]
-    };
-
-    fs.writeFileSync(tempTsconfigPath, JSON.stringify(tsconfigContent, null, 2));
-
-    return tempTsconfigPath;
   }
 
   private formatTypeScriptDiagnostic(diagnostic: any): string {
