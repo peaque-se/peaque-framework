@@ -3,12 +3,8 @@
 import { config as loadEnv } from 'dotenv';
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import { DevServer } from './dev-server.js';
 import { PeaqueFramework } from './framework.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const command = process.argv[2];
 
@@ -16,24 +12,8 @@ const command = process.argv[2];
 const args = process.argv.slice(3);
 const verbose = args.includes('--verbose') || args.includes('-v');
 
-// Show help if requested
-if (command === 'help' || command === '--help' || command === '-h' || !command) {
-  console.log('Usage: peaque <command> [options]');
-  console.log('');
-  console.log('Commands:');
-  console.log('  dev     Start development server with HMR');
-  console.log('  build   Build the application for production');
-  console.log('  start   Start the production server');
-  console.log('');
-  console.log('Options:');
-  console.log('  -v, --verbose   Enable verbose logging');
-  console.log('  -h, --help      Show this help message');
-  process.exit(0);
-}
-
 function makeFramework(): PeaqueFramework {
   const cwd = process.cwd();
-  const t0 = Date.now()
 
   // Load environment variables from .env files
   const envPath = path.join(cwd, '.env');
@@ -55,14 +35,27 @@ function makeFramework(): PeaqueFramework {
     port: parseInt(process.env.PORT || '3000'),
     host: process.env.HOST || 'localhost',
     dev: command === 'dev',
-    pagesDir: fs.existsSync(path.join(cwd, 'src', 'pages')) ? path.join(cwd, 'src', 'pages') : path.join(cwd, 'pages'),
-    apiDir: fs.existsSync(path.join(cwd, 'src', 'api')) ? path.join(cwd, 'src', 'api') : path.join(cwd, 'api'),
-    publicDir: fs.existsSync(path.join(cwd, 'src', 'public')) ? path.join(cwd, 'src', 'public') : path.join(cwd, 'public'),
+    pagesDir: path.join(cwd, 'src', 'pages'),
+    apiDir: path.join(cwd, 'src', 'api'),
+    publicDir: path.join(cwd, 'src', 'public'),
     buildDir: path.join(cwd, '.peaque', 'dist'),
     logger: verbose
   };
 
   return new PeaqueFramework(config);
+}
+
+function showHelp() {
+      console.log('Usage: peaque <command> [options]');
+      console.log('');
+      console.log('Commands:');
+      console.log('  dev     Start development server with HMR');
+      console.log('  build   Build the application for production');
+      console.log('  start   Start the production server');
+      console.log('');
+      console.log('Options:');
+      console.log('  -v, --verbose   Enable verbose logging');
+      console.log('  -h, --help      Show this help message');
 }
 
 async function main() {
@@ -108,19 +101,16 @@ async function main() {
       await makeFramework().start();
       break;
 
+    case 'help':
+    case '--help':
+    case '-h':
+      showHelp();
+      process.exit(0);
+
     default:
       console.log('❌ Unknown command:', command);
       console.log('');
-      console.log('Usage: peaque <command> [options]');
-      console.log('');
-      console.log('Commands:');
-      console.log('  dev     Start development server with HMR');
-      console.log('  build   Build the application for production');
-      console.log('  start   Start the production server');
-      console.log('');
-      console.log('Options:');
-      console.log('  -v, --verbose   Enable verbose logging');
-      console.log('  -h, --help      Show this help message');
+      showHelp();
       process.exit(1);
   }
 }
