@@ -630,44 +630,20 @@ root.render(
     try {
       // Import PostCSS and plugins dynamically
       const postcss = (await import('postcss')).default;
-      const tailwindcss = (await import('tailwindcss')).default;
+      const tailwind = (await import('@tailwindcss/postcss')).default;
       const autoprefixer = (await import('autoprefixer')).default;
 
       const cssContent = fs.readFileSync(cssPath, 'utf-8');
 
-      // Create programmatic Tailwind configuration
-      const tailwindConfig = {
-        content: [
-          path.join(projectRoot, 'pages/**/*.{js,ts,jsx,tsx}'),
-          path.join(projectRoot, 'components/**/*.{js,ts,jsx,tsx}'),
-          path.join(projectRoot, 'api/**/*.{js,ts}'),
-          path.join(projectRoot, '*.{js,ts,jsx,tsx}'),
-        ],
-        theme: {
-          extend: {},
-        },
-        plugins: [],
-      };
-
       // Check if user has custom tailwind config
       const userConfigPath = path.join(projectRoot, 'tailwind.config.js');
-
-      let finalConfig = tailwindConfig;
-
-      // Try to load user's custom config if it exists
       if (fs.existsSync(userConfigPath)) {
-        try {
-          // For now, just use the default config but inform user
-          console.log('🎨 Found custom tailwind.config.js - using programmatic config with user paths');
-          // In a future version, we could implement proper config merging
-        } catch (error) {
-          console.warn('⚠️  Could not load custom tailwind.config.js, using defaults');
-        }
+        console.log('🎨 Found custom tailwind.config.js');
       }
 
-      // Process CSS with Tailwind and Autoprefixer
+      // Process CSS with Tailwind CSS 4 and Autoprefixer
       const result = await postcss([
-        tailwindcss(finalConfig),
+        tailwind(),
         autoprefixer
       ]).process(cssContent, {
         from: cssPath,
