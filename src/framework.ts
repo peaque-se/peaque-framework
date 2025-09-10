@@ -219,6 +219,17 @@ export class PeaqueFramework {
       const mainEntryPath = path.join(root, '.peaque', '_generated_main.tsx');
       fs.writeFileSync(mainEntryPath, mainEntryContent);
 
+      // Validate TypeScript types
+      console.log('🔍 Validating TypeScript types...');
+      const typeValidation = await this.validateTypes(mainEntryPath);
+
+      if (!typeValidation.success) {
+        console.error('❌ Type validation failed');
+        return { success: false, errors: typeValidation.errors };
+      }
+
+      console.log('✅ Type validation passed');
+
       // Build the frontend
       const buildResult = await this.buildFrontend(mainEntryPath);
 
@@ -687,5 +698,161 @@ window.process = window.process || {};
 window.process.env = window.process.env || {};
 Object.assign(window.process.env, ${envJson});
 </script>`;
+  }
+
+  private async validateTypes(mainEntryPath: string): Promise<{ success: boolean; errors?: string[] }> {
+    try {
+      // Import TypeScript compiler API
+      const ts = await import('typescript');
+
+      const projectRoot = path.resolve(this.config.pagesDir, '..');
+
+      // Generate or find tsconfig.json
+      const tsconfigPath = await this.generateTsconfigForTypeChecking(projectRoot, mainEntryPath);
+
+      // Read and parse tsconfig.json
+      const configFileResult = ts.readConfigFile(tsconfigPath, ts.sys.readFile);
+      if (configFileResult.error) {
+        return {
+          success: false,
+          errors: [`Failed to read TypeScript config: ${configFileResult.error.messageText}`]
+        };
+      }
+
+      const parsedConfig = ts.parseJsonConfigFileContent(
+        configFileResult.config,
+        ts.sys,
+        path.dirname(tsconfigPath)
+      );
+
+      if (parsedConfig.errors.length > 0) {
+        const errors = parsedConfig.errors.map(diagnostic =>
+          this.formatTypeScriptDiagnostic(diagnostic)
+        );
+        return { success: false, errors };
+      }
+
+      // Create TypeScript program for type checking
+      const program = ts.createProgram({
+        rootNames: parsedConfig.fileNames,
+        options: parsedConfig.options
+      });
+
+      // Get diagnostics (type errors)
+      const allDiagnostics = [
+        ...program.getConfigFileParsingDiagnostics(),
+        ...program.getSyntacticDiagnostics(),
+        ...program.getSemanticDiagnostics()
+      ].filter(diagnostic => {
+        // Filter out certain diagnostics that are not relevant in our build context
+        // Skip lib.d.ts related errors and other non-user-code diagnostics
+        if (!diagnostic.file) return false;
+
+        const fileName = diagnostic.file.fileName;
+        // Skip node_modules and built-in TypeScript library diagnostics
+        if (fileName.includes('node_modules') || fileName.includes('lib.') || fileName.includes('typescript/lib')) {
+          return false;
+        }
+
+        return true;
+      });
+
+      if (allDiagnostics.length > 0) {
+        const errors = allDiagnostics.map(diagnostic =>
+          this.formatTypeScriptDiagnostic(diagnostic)
+        );
+        return { success: false, errors };
+      }
+
+      return { success: true };
+
+    } catch (error: any) {
+      return {
+        success: false,
+        errors: [`TypeScript validation error: ${error.message}`]
+      };
+    }
+  }
+
+  private async generateTsconfigForTypeChecking(projectRoot: string, mainEntryPath: string): Promise<string> {
+    const userTsconfigPath = path.join(projectRoot, 'tsconfig.json');
+
+    // If user has their own tsconfig.json, use it
+    if (fs.existsSync(userTsconfigPath)) {
+      return userTsconfigPath;
+    }
+
+    // Generate a temporary tsconfig.json for type checking in the project root
+    const tempTsconfigPath = path.join(projectRoot, '.peaque-tsconfig.json');
+
+    // Determine which directories exist to include
+    const includePaths: string[] = [];
+
+    // Check for pages directory structure
+    if (fs.existsSync(path.join(projectRoot, 'pages'))) {
+      includePaths.push("pages/**/*");
+    }
+    if (fs.existsSync(path.join(projectRoot, 'src', 'pages'))) {
+      includePaths.push("src/pages/**/*");
+    }
+
+    // Check for API directory structure  
+    if (fs.existsSync(path.join(projectRoot, 'api'))) {
+      includePaths.push("api/**/*");
+    }
+    if (fs.existsSync(path.join(projectRoot, 'src', 'api'))) {
+      includePaths.push("src/api/**/*");
+    }
+
+    // Always include the generated main entry
+    includePaths.push(".peaque/_generated_main.tsx");
+
+    const tsconfigContent = {
+      compilerOptions: {
+        target: "ES2020",
+        module: "ES2020",
+        lib: ["ES2020", "DOM", "DOM.Iterable"],
+        allowJs: true,
+        skipLibCheck: true,
+        esModuleInterop: true,
+        allowSyntheticDefaultImports: true,
+        strict: true,
+        forceConsistentCasingInFileNames: true,
+        moduleResolution: "bundler",
+        resolveJsonModule: true,
+        isolatedModules: true,
+        noEmit: true,
+        jsx: "react-jsx",
+        jsxImportSource: "react",
+        types: ["node", "react", "react-dom"],
+        baseUrl: ".",
+        paths: {
+          "@peaque/framework": ["node_modules/@peaque/framework/dist/index.d.ts"]
+        }
+      },
+      include: includePaths,
+      exclude: [
+        "node_modules",
+        ".peaque/dist"
+      ]
+    };
+
+    fs.writeFileSync(tempTsconfigPath, JSON.stringify(tsconfigContent, null, 2));
+
+    return tempTsconfigPath;
+  }
+
+  private formatTypeScriptDiagnostic(diagnostic: any): string {
+    if (!diagnostic.file) {
+      return `TypeScript Error: ${diagnostic.messageText}`;
+    }
+
+    const { line, character } = diagnostic.file.getLineAndCharacterOfPosition(diagnostic.start);
+    const fileName = path.relative(process.cwd(), diagnostic.file.fileName);
+    const messageText = typeof diagnostic.messageText === 'string'
+      ? diagnostic.messageText
+      : diagnostic.messageText.messageText;
+
+    return `${fileName}(${line + 1},${character + 1}): error TS${diagnostic.code}: ${messageText}`;
   }
 }
