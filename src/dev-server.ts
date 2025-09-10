@@ -14,6 +14,7 @@ export class DevServer {
   private wss: any = null;
   private framework: PeaqueFramework;
   private watcher: chokidar.FSWatcher | null = null;
+  private watchedDependencies: Set<string> = new Set();
 
   constructor(framework: PeaqueFramework) {
     this.framework = framework;
@@ -59,6 +60,7 @@ export class DevServer {
       const isAPIFile = filePath.includes(path.sep + 'api' + path.sep) && (filePath.endsWith('.ts') || filePath.endsWith('.js'));
       const isCSSFile = filePath.endsWith('.css');
       const isTailwindConfig = filePath.endsWith('tailwind.config.js');
+      const isDependency = this.watchedDependencies.has(path.resolve(filePath));
 
       if (isCSSFile || isTailwindConfig) {
         // Reprocess CSS for CSS/Tailwind changes
@@ -72,6 +74,11 @@ export class DevServer {
         // API changes require server-side reload of routes
         await this.reloadAPIRoutes();
         this.notifyClients('api-update', { filePath });
+      } else if (isDependency) {
+        // Dependencies outside of /src/pages require a rebuild
+        console.log(`🔄 Dependency changed: ${filePath}`);
+        await this.rebuildApplication();
+        this.notifyClients('page-update', { filePath });
       } else {
         // For other files, do a full reload
         this.notifyClients('reload');
@@ -123,7 +130,7 @@ export class DevServer {
     await this.buildHMRClient();
 
     // Initial build
-    await build({
+    const result = await build({
       entryPoints: [
         mainEntryPath
       ],
@@ -134,6 +141,7 @@ export class DevServer {
       sourcemap: true,
       sourcesContent: true,
       sourceRoot: '/',
+      metafile: true,
       define: {
         'process.env.NODE_ENV': '"development"'
       },
@@ -151,6 +159,9 @@ export class DevServer {
         'react-dom': 'react-dom'
       }
     });
+
+    // Update watched dependencies based on build metafile
+    this.updateWatchedDependencies(result.metafile);
 
     // Process CSS with Tailwind
     await this.processDevCSS();
@@ -168,7 +179,7 @@ export class DevServer {
     fs.writeFileSync(mainEntryPath, mainEntryContent);
 
     // Rebuild the application
-    await build({
+    const result = await build({
       entryPoints: [
         mainEntryPath
       ],
@@ -179,6 +190,7 @@ export class DevServer {
       sourcemap: true,
       sourcesContent: true,
       sourceRoot: '/',
+      metafile: true,
       define: {
         'process.env.NODE_ENV': '"development"'
       },
@@ -196,6 +208,9 @@ export class DevServer {
         'react-dom': 'react-dom'
       }
     });
+
+    // Update watched dependencies based on build metafile
+    this.updateWatchedDependencies(result.metafile);
 
   }
 
@@ -237,6 +252,61 @@ export class DevServer {
       await this.framework.reloadAPIRoutes();
     } catch (error) {
       console.error('❌ Failed to reload API routes:', error);
+    }
+  }
+
+  private updateWatchedDependencies(metafile: any): void {
+    if (!metafile || !metafile.inputs) {
+      return;
+    }
+
+    // Extract all input files from esbuild metafile
+    const newDependencies = new Set<string>();
+    
+    for (const inputPath in metafile.inputs) {
+      // Filter out node_modules
+      if (inputPath.includes('node_modules')) {
+        continue;
+      }
+
+      // Normalize to absolute path
+      const absolutePath = path.isAbsolute(inputPath) 
+        ? inputPath 
+        : path.resolve(process.cwd(), inputPath);
+
+      // Only watch actual source files (not generated files)
+      if (fs.existsSync(absolutePath) && !absolutePath.includes('.peaque')) {
+        newDependencies.add(absolutePath);
+      }
+    }
+
+    // Update the watcher if dependencies have changed
+    const currentDeps = Array.from(this.watchedDependencies).sort();
+    const newDeps = Array.from(newDependencies).sort();
+    
+    if (JSON.stringify(currentDeps) !== JSON.stringify(newDeps)) {
+      this.watchedDependencies = newDependencies;
+      this.updateFileWatcher();
+    }
+  }
+
+  private updateFileWatcher(): void {
+    const config = this.framework.getConfig();
+    
+    // Always watch these core directories and files
+    const alwaysWatch = [
+      path.join(config.pagesDir, '**/*.{ts,tsx,js,jsx}'),
+      path.join(config.apiDir, '**/*.{ts,js}'),
+      path.join(config.pagesDir, '..', 'styles.css'),
+      path.join(config.pagesDir, '..', 'tailwind.config.js')
+    ];
+
+    // Add all detected dependencies
+    const watchPaths = [...alwaysWatch, ...Array.from(this.watchedDependencies)];
+    
+    if (this.watcher) {
+      // Update existing watcher with new paths
+      this.watcher.add(watchPaths);
     }
   }
 
