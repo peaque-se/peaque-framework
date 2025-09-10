@@ -59,7 +59,7 @@ export class PeaqueFramework {
         host: this.config.host
       });
 
-      console.log(`🚀 Peaque server running on http://${this.config.host}:${this.config.port} after ${(Date.now() - this.t0).toLocaleString()} ms`);
+      console.log(`🚀 Peaque server running on http://${this.config.host}:${this.config.port} after ${(Date.now() - this.t0).toLocaleString('en-US')} ms`);
     } catch (error) {
       console.error('Failed to start server:', error);
       process.exit(1);
@@ -198,7 +198,7 @@ export class PeaqueFramework {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Peaque App</title>
+  <title>Peaque App Framework</title>
   <link rel="stylesheet" href="/peaque.css">
 </head>
 <body>
@@ -269,8 +269,6 @@ export class PeaqueFramework {
           'react': 'react',
           'react-dom': 'react-dom'
         },
-        // Deduplicate React to prevent multiple instances
-        conditions: ['react-server']
       });
 
       // Process CSS with Tailwind
@@ -369,7 +367,7 @@ export class PeaqueFramework {
 
     // Generate the complete main entry content
     const frameworkPath = '@peaque/framework';
-    const content = `import React, { StrictMode } from 'react';
+    const content = `import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { Router as ClientRouter } from '${frameworkPath}';
 
@@ -389,9 +387,7 @@ function App() {
 
 const root = ReactDOM.createRoot(document.getElementById('peaque')!);
   root.render(
-    <StrictMode>
       <App />
-    </StrictMode>
   );
 `;
 
