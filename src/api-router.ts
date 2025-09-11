@@ -176,15 +176,13 @@ export class PeaqueRequestImpl implements PeaqueRequest {
     this.sendData = `Redirecting to ${url}`; // Optional body for redirect?!
   }
 
-  // WebSocket methods - basic implementation for compatibility
+  // WebSocket upgrade support (not implemented in this basic request implementation)
   isUpgradeRequest(): boolean {
-    // This should be overridden by specific server implementations
-    return false;
+    return false; // This implementation doesn't support WebSocket upgrades
   }
 
-  upgradeToWebSocket(handler: WebSocketHandler): PeaqueWebSocket {
-    // This should be overridden by specific server implementations
-    throw new Error('WebSocket upgrade not supported in this implementation');
+  upgradeToWebSocket(handler: any): any {
+    throw new Error('WebSocket upgrade not supported in this request implementation');
   }
 }
 

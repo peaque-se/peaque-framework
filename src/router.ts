@@ -60,6 +60,15 @@ export class Router {
     return guardFiles;
   }
 
+  async discoverMiddleware(apiDir: string): Promise<string[]> {
+    const middlewareFiles = await glob('**/middleware.{ts,js}', {
+      cwd: apiDir,
+      absolute: true
+    });
+
+    return middlewareFiles;
+  }
+
   private filePathToRoutePath(filePath: string, baseDir: string): string {
     // Convert file path to API route path
     // e.g., /api/users/route.ts -> /api/users

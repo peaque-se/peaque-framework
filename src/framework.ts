@@ -7,6 +7,7 @@ import { createPeaqueRequestFromFastify, writePeaqueRequestToFastify } from './f
 import { RouteHandler } from './public-types.js';
 import { Router } from './router.js';
 import { TailwindUtils } from './tailwind.js';
+import { MiddlewareSystem } from './middleware-system.js';
 
 // Load environment variables from .env files
 config();
@@ -17,6 +18,7 @@ export class PeaqueFramework {
   private config: Required<FrameworkConfig>;
   private isDev: boolean;
   private routeHandlers: Map<string, RouteHandler> = new Map();
+  private middlewareSystem: MiddlewareSystem = new MiddlewareSystem();
   private t0: number;
 
   constructor(config: FrameworkConfig = {}) {
@@ -67,14 +69,20 @@ export class PeaqueFramework {
   }
 
   private async setupRoutes(): Promise<void> {
+    // Discover and load middleware first
+    const middlewareFiles = await this.router.discoverMiddleware(this.config.apiDir);
+    await this.middlewareSystem.loadMiddleware(middlewareFiles, this.config.apiDir);
+
     // Discover and register API routes
     const apiRoutes = await this.router.discoverRoutes(this.config.apiDir);
 
     for (const route of apiRoutes) {
+      // Apply middleware to the route handler
+      const wrappedHandler = this.middlewareSystem.wrapHandler(route.path, route.handler);
 
-      // Store the handler for potential reloading
+      // Store the wrapped handler for potential reloading
       const routeKey = `${route.method}:${route.path}`;
-      this.routeHandlers.set(routeKey, route.handler);
+      this.routeHandlers.set(routeKey, wrappedHandler);
 
       this.fastify.route({
         method: route.method,
@@ -110,14 +118,19 @@ export class PeaqueFramework {
     }
 
     try {
+      // Re-discover and reload middleware first
+      const middlewareFiles = await this.router.discoverMiddleware(this.config.apiDir);
+      this.middlewareSystem = new MiddlewareSystem(); // Reset middleware system
+      await this.middlewareSystem.loadMiddleware(middlewareFiles, this.config.apiDir);
 
       // Re-discover API routes
       const apiRoutes = await this.router.discoverRoutes(this.config.apiDir);
 
-      // Update handlers in the map
+      // Update handlers in the map with middleware applied
       for (const route of apiRoutes) {
+        const wrappedHandler = this.middlewareSystem.wrapHandler(route.path, route.handler);
         const routeKey = `${route.method}:${route.path}`;
-        this.routeHandlers.set(routeKey, route.handler);
+        this.routeHandlers.set(routeKey, wrappedHandler);
       }
 
     } catch (error) {
