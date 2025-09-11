@@ -58,6 +58,8 @@ export class DevServer {
       // Determine the type of file that changed
       const isPageFile = filePath.includes(path.sep + 'pages' + path.sep) && (filePath.endsWith('.tsx') || filePath.endsWith('.jsx') || filePath.endsWith('.ts') || filePath.endsWith('.js'));
       const isAPIFile = filePath.includes(path.sep + 'api' + path.sep) && (filePath.endsWith('.ts') || filePath.endsWith('.js'));
+      const isHeadFile = filePath.includes(path.sep + 'pages' + path.sep) && filePath.endsWith('head.ts');
+      const isIconFile = filePath.includes(path.sep + 'pages' + path.sep) && (filePath.includes('favicon.') || filePath.includes('icon.') || filePath.includes('apple-'));
       const isCSSFile = filePath.endsWith('.css');
       const isTailwindConfig = filePath.endsWith('tailwind.config.js');
       const isDependency = this.watchedDependencies.has(path.resolve(filePath));
@@ -66,6 +68,11 @@ export class DevServer {
         // Reprocess CSS for CSS/Tailwind changes
         await this.processDevCSS();
         this.notifyClients('css-update', { filePath });
+      } else if (isHeadFile || isIconFile) {
+        // Reload head configurations and re-copy icons for head/icon changes
+        console.log(`🔄 Head/Icon file changed: ${filePath}`);
+        await this.reloadHeadConfigurations();
+        this.notifyClients('reload'); // Full reload since head changes affect HTML
       } else if (isPageFile) {
         // Rebuild the application for page changes
         await this.rebuildApplication();
@@ -281,6 +288,17 @@ export class DevServer {
       await this.framework.reloadAPIRoutes();
     } catch (error) {
       console.error('❌ Failed to reload API routes:', error);
+    }
+  }
+
+  private async reloadHeadConfigurations(): Promise<void> {
+    try {
+      console.log('🔄 Reloading head configurations and icons...');
+      await this.framework.setupHeadConfigurations();
+      await this.framework.copyHeadAssets();
+      console.log('✅ Head configurations and icons reloaded successfully');
+    } catch (error) {
+      console.error('❌ Failed to reload head configurations:', error);
     }
   }
 

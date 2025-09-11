@@ -78,3 +78,61 @@ export type WebSocketHandler = {
   onClose?: (code: number, reason: string, ws: PeaqueWebSocket) => void
   onError?: (error: string, ws: PeaqueWebSocket) => void
 }
+
+// Head management types for custom meta tags, icons, and head elements
+
+export interface MetaTag {
+  name?: string;
+  property?: string;
+  httpEquiv?: string;
+  content: string;
+  charset?: string;
+}
+
+export interface LinkTag {
+  rel: string;
+  href: string;
+  type?: string;
+  sizes?: string;
+  media?: string;
+  crossOrigin?: string;
+  integrity?: string;
+  as?: 'document' | 'font' | 'image' | 'script' | 'style' | 'video' | 'audio' | 'fetch' | 'worker' | 'embed' | 'object' | 'track';
+}
+
+export interface ScriptTag {
+  src?: string;
+  type?: string;
+  async?: boolean;
+  defer?: boolean;
+  crossOrigin?: string;
+  integrity?: string;
+  innerHTML?: string;
+}
+
+export interface IconConfig {
+  rel: 'icon' | 'apple-touch-icon' | 'shortcut icon' | 'mask-icon';
+  href: string;
+  sizes?: string;
+  type?: string;
+  color?: string;
+}
+
+export interface HeadConfig {
+  title?: string;
+  description?: string;
+  keywords?: string;
+  author?: string;
+  viewport?: string;
+  charset?: string;
+  icons?: IconConfig[];
+  meta?: MetaTag[];
+  links?: LinkTag[];
+  scripts?: ScriptTag[];
+}
+
+export interface ResolvedHeadConfig extends HeadConfig {
+  // Additional properties added during resolution
+  _filePath?: string;
+  _priority?: number;
+}

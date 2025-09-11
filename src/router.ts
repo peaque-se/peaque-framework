@@ -1,8 +1,8 @@
 import { glob } from 'glob';
 import path from 'path';
-import { RouteHandler, HttpMethod } from './public-types.js';
-import { importWithTsPaths } from './route-import.js';
 import { RouteDefinition } from './api-router.js';
+import { HeadConfig, HttpMethod, RouteHandler } from './public-types.js';
+import { importWithTsPaths } from './route-import.js';
 
 export class Router {
   private routes: RouteDefinition[] = [];
@@ -69,6 +69,87 @@ export class Router {
     return middlewareFiles;
   }
 
+  async discoverHeadFiles(pagesDir: string): Promise<string[]> {
+    const headFiles = await glob('**/head.{ts,js}', {
+      cwd: pagesDir,
+      absolute: true
+    });
+
+    return headFiles;
+  }
+
+  async discoverIconFiles(pagesDir: string): Promise<{ [key: string]: string }> {
+    const iconPatterns = [
+      '**/favicon.ico',
+      '**/icon.{ico,png,jpg,jpeg,svg}',
+      '**/apple-touch-icon.{png,jpg,jpeg}',
+      '**/apple-icon.{png,jpg,jpeg}'
+    ];
+
+    const iconFiles: { [key: string]: string } = {};
+
+    for (const pattern of iconPatterns) {
+      const files = await glob(pattern, {
+        cwd: pagesDir,
+        absolute: true
+      });
+
+      for (const filePath of files) {
+        const filename = path.basename(filePath);
+        const ext = path.extname(filename).toLowerCase();
+        const basename = path.basename(filename, ext);
+
+        // Determine icon type based on filename
+        let rel: string;
+        if (filename === 'favicon.ico') {
+          rel = 'icon';
+        } else if (basename.startsWith('apple-touch-icon') || basename.startsWith('apple-icon')) {
+          rel = 'apple-touch-icon';
+        } else if (basename.startsWith('icon')) {
+          rel = 'icon';
+        } else {
+          rel = 'icon';
+        }
+
+        // Convert file path to route path for icon mapping
+        const routePath = this.iconFilePathToRoutePath(filePath, pagesDir);
+        const iconKey = routePath + '_' + rel + '_' + filename;
+        iconFiles[iconKey] = filePath;
+      }
+    }
+
+    return iconFiles;
+  }
+
+  private iconFilePathToRoutePath(filePath: string, pagesDir: string): string {
+    // Convert icon file path to route path
+    // e.g., /pages/blog/icon.svg -> /blog
+    // e.g., /pages/favicon.ico -> /
+    const relativePath = path.relative(pagesDir, filePath);
+    const normalizedPath = relativePath.replace(/\\/g, '/');
+
+    // Remove icon filename - handle root level files specially
+    let routePath = normalizedPath.replace(/(favicon\.ico|icon\.[^\/]+|apple-touch-icon\.[^\/]+|apple-icon\.[^\/]+)$/, '');
+
+    // Remove trailing slash if not root
+    routePath = routePath.replace(/\/$/, '');
+
+    // Convert dynamic segments
+    routePath = routePath.replace(/\[([^\]]+)\]/g, ':$1');
+
+    // Handle empty string or root level -> root path
+    if (routePath === '' || routePath === '/') {
+      return '/';
+    }
+
+    // Ensure it starts with /
+    if (!routePath.startsWith('/')) {
+      routePath = '/' + routePath;
+    }
+
+    return routePath;
+  }
+
   private filePathToRoutePath(filePath: string, baseDir: string): string {
     // Convert file path to API route path
     // e.g., /api/users/route.ts -> /api/users
@@ -81,7 +162,38 @@ export class Router {
     return routePath || '/';
   }
 
+  async loadHeadConfig(filePath: string): Promise<HeadConfig | null> {
+    try {
+      const fileUrl = `file://${filePath.replace(/\\/g, '/')}`;
+      const module = await importWithTsPaths(fileUrl + '?t=' + Date.now(), {
+        absWorkingDir: process.cwd(),
+      });
 
+      // Look for default export or named exports
+      if (module.default && typeof module.default === 'object') {
+        return module.default as HeadConfig;
+      }
+
+      // Try to construct HeadConfig from named exports
+      const config: HeadConfig = {};
+      if (module.title) config.title = module.title;
+      if (module.description) config.description = module.description;
+      if (module.keywords) config.keywords = module.keywords;
+      if (module.author) config.author = module.author;
+      if (module.viewport) config.viewport = module.viewport;
+      if (module.charset) config.charset = module.charset;
+      if (module.icons) config.icons = module.icons;
+      if (module.meta) config.meta = module.meta;
+      if (module.links) config.links = module.links;
+      if (module.scripts) config.scripts = module.scripts;
+
+      return Object.keys(config).length > 0 ? config : null;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.warn(`⚠️  Warning: Could not load head config from ${filePath}: ${errorMessage}`);
+      return null;
+    }
+  }
 
   private async loadRouteHandlers(filePath: string): Promise<Record<string, RouteHandler>> {
     try {

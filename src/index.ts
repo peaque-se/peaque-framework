@@ -31,4 +31,14 @@ export type {
   CookieJar,
 } from './public-types.js';
 
+// Head Management Types
+export type {
+  HeadConfig,
+  ResolvedHeadConfig,
+  MetaTag,
+  LinkTag,
+  ScriptTag,
+  IconConfig,
+} from './public-types.js';
+
 

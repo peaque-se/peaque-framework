@@ -4,10 +4,11 @@ import fs from 'fs';
 import path from 'path';
 import { FrameworkConfig } from './api-router.js';
 import { createPeaqueRequestFromFastify, writePeaqueRequestToFastify } from './fastify.js';
+import { HeadManager } from './head-manager.js';
+import { MiddlewareSystem } from './middleware-system.js';
 import { RouteHandler } from './public-types.js';
 import { Router } from './router.js';
 import { TailwindUtils } from './tailwind.js';
-import { MiddlewareSystem } from './middleware-system.js';
 
 // Load environment variables from .env files
 config();
@@ -15,6 +16,7 @@ config();
 export class PeaqueFramework {
   private fastify: ReturnType<typeof Fastify>;
   private router: Router;
+  private headManager: HeadManager;
   private config: Required<FrameworkConfig>;
   private isDev: boolean;
   private routeHandlers: Map<string, RouteHandler> = new Map();
@@ -40,6 +42,7 @@ export class PeaqueFramework {
     });
 
     this.router = new Router();
+    this.headManager = new HeadManager();
 
     // Ensure .peaque directory exists
     const peaqueDir = path.dirname(this.config.buildDir);
@@ -53,6 +56,8 @@ export class PeaqueFramework {
   async start(): Promise<void> {
     try {
       await this.setupRoutes();
+      await this.setupHeadConfigurations();
+      await this.copyHeadAssets(); // Copy icons to serve in dev mode
       await this.setupStaticFiles();
       await this.setupSPA();
 
@@ -138,6 +143,92 @@ export class PeaqueFramework {
     }
   }
 
+  public async setupHeadConfigurations(): Promise<void> {
+    try {
+      // Discover head configuration files
+      const headFiles = await this.router.discoverHeadFiles(this.config.pagesDir);
+
+      // Load and add head configurations
+      for (const filePath of headFiles) {
+        const headConfig = await this.router.loadHeadConfig(filePath);
+        if (headConfig) {
+          // Convert file path to route path for head config mapping
+          const routePath = this.headFilePathToRoutePath(filePath, this.config.pagesDir);
+          this.headManager.addHeadConfig(routePath, headConfig, filePath);
+        }
+      }
+
+      // Discover and add icon files from pages directory
+      const iconFiles = await this.router.discoverIconFiles(this.config.pagesDir);
+      this.headManager.addIconFiles(iconFiles);
+
+    } catch (error) {
+      console.warn('⚠️  Warning: Could not setup head configurations:', error);
+    }
+  }
+
+  private headFilePathToRoutePath(filePath: string, pagesDir: string): string {
+    // Convert head file path to route path
+    // e.g., /pages/blog/head.ts -> /blog
+    // e.g., /pages/head.ts -> /
+    const relativePath = path.relative(pagesDir, filePath);
+    const normalizedPath = relativePath.replace(/\\/g, '/');
+
+    // Remove head.ts or head.js filename
+    let routePath = normalizedPath.replace(/head\.(ts|js)$/, '');
+
+    // Remove trailing slash if exists
+    routePath = routePath.replace(/\/$/, '');
+
+    // Convert dynamic segments
+    routePath = routePath.replace(/\[([^\]]+)\]/g, ':$1');
+
+    // Ensure it starts with /
+    if (!routePath.startsWith('/')) {
+      routePath = '/' + routePath;
+    }
+
+    // Handle empty string -> root path
+    if (routePath === '/' || routePath === '') {
+      return '/';
+    }
+
+    return routePath;
+  }
+
+  public async copyHeadAssets(): Promise<void> {
+    try {
+      // Discover icon files that need to be copied to build directory
+      const iconFiles = await this.router.discoverIconFiles(this.config.pagesDir);
+
+      // Copy to correct directory based on dev vs production mode
+      const targetDir = this.isDev ? path.join(this.config.buildDir, 'dev') : this.config.buildDir;
+
+      for (const [key, sourcePath] of Object.entries(iconFiles)) {
+        const [iconRoutePath, rel, filename] = key.split('_', 3);
+
+        // Preserve folder structure: root icons at root, route-specific icons in subfolders
+        let destPath: string;
+        if (iconRoutePath === '/') {
+          destPath = path.join(targetDir, filename);
+        } else {
+          // Create subdirectory for route-specific icons (e.g., blog/icon.svg)
+          const subDir = path.join(targetDir, iconRoutePath.substring(1)); // Remove leading /
+          fs.mkdirSync(subDir, { recursive: true });
+          destPath = path.join(subDir, filename);
+        }
+
+        try {
+          fs.copyFileSync(sourcePath, destPath);
+        } catch (error) {
+          console.warn(`⚠️  Warning: Could not copy icon file ${filename}:`, error);
+        }
+      }
+    } catch (error) {
+      console.warn('⚠️  Warning: Could not copy head assets:', error);
+    }
+  }
+
   private async setupStaticFiles(): Promise<void> {
     // Serve built assets first (higher priority in dev mode)
     const assetsDir = this.isDev ? path.join(this.config.buildDir, 'dev') : this.config.buildDir;
@@ -186,8 +277,10 @@ export class PeaqueFramework {
       }
 
       if (this.isDev) {
-        // In dev mode, serve the dev HTML
-        const html = this.generateDevHTML();
+        // In dev mode, serve the dev HTML with route-specific head configuration
+        // Strip query parameters for route matching
+        const routePath = request.url.split('?')[0];
+        const html = this.generateDevHTML(routePath);
         reply.type('text/html').send(html);
       } else {
         // In production, serve the built index.html
@@ -201,17 +294,19 @@ export class PeaqueFramework {
     });
   }
 
-  private generateDevHTML(): string {
+  private generateDevHTML(routePath: string = '/'): string {
     const publicEnvVars = this.getPublicEnvVars();
     const envScript = this.generateEnvScript(publicEnvVars);
+
+    // Get head configuration for this route
+    const headConfig = this.headManager.resolveHeadConfig(routePath);
+    const headHTML = this.headManager.generateHeadHTML(headConfig);
 
     return `
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Peaque App Framework</title>
+${headHTML}
   <link rel="stylesheet" href="/peaque.css">
 </head>
 <body>
@@ -243,12 +338,18 @@ export class PeaqueFramework {
 
       console.log('✅ Type validation passed');
 
+      // Setup head configurations for build
+      await this.setupHeadConfigurations();
+
       // Build the frontend
       const buildResult = await this.buildFrontend(mainEntryPath);
 
       if (!buildResult.success) {
         return { success: false, errors: buildResult.errors };
       }
+
+      // Copy head assets (icons, etc.)
+      await this.copyHeadAssets();
 
       // Generate production HTML
       const html = this.generateProdHTML();
@@ -304,17 +405,19 @@ export class PeaqueFramework {
     }
   }
 
-  private generateProdHTML(): string {
+  private generateProdHTML(routePath: string = '/'): string {
     const publicEnvVars = this.getPublicEnvVars();
     const envScript = this.generateEnvScript(publicEnvVars);
+
+    // Get head configuration for this route
+    const headConfig = this.headManager.resolveHeadConfig(routePath);
+    const headHTML = this.headManager.generateHeadHTML(headConfig);
 
     return `
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Peaque App</title>
+${headHTML}
   <link rel="stylesheet" href="/peaque.css">
 </head>
 <body>
