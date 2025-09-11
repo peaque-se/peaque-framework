@@ -1,8 +1,8 @@
-import { PeaqueRequestImpl } from "../api-router"
-import { HttpMethod, PeaqueRequest, MatchingRoute, PeaqueWebSocket, WebSocketHandler } from "./http-types"
-import { Router } from "./http-router"
 import http from "http"
-import { WebSocketServer, WebSocket } from "ws"
+import { WebSocket, WebSocketServer } from "ws"
+import { PeaqueRequestImpl } from "../api-router"
+import { Router } from "./http-router"
+import { HttpMethod, PeaqueWebSocket, WebSocketHandler } from "./http-types"
 
 class DeferredPeaqueWebSocket implements PeaqueWebSocket {
   private ws?: WebSocket
@@ -53,19 +53,7 @@ class PeaqueRequestImplWithWebSocket extends PeaqueRequestImpl {
   private rawResponse?: http.ServerResponse
   private server?: HttpServer
 
-  constructor(
-    bodyData: any,
-    paramsData: Record<string, string>,
-    queryData: Record<string, string | string[]>,
-    headersData: Record<string, string | string[]>,
-    methodData: HttpMethod,
-    urlData: string,
-    ipData: string,
-    cookieHeader: string | undefined,
-    rawRequest?: http.IncomingMessage,
-    rawResponse?: http.ServerResponse,
-    server?: HttpServer
-  ) {
+  constructor(bodyData: any, paramsData: Record<string, string>, queryData: Record<string, string | string[]>, headersData: Record<string, string | string[]>, methodData: HttpMethod, urlData: string, ipData: string, cookieHeader: string | undefined, rawRequest?: http.IncomingMessage, rawResponse?: http.ServerResponse, server?: HttpServer) {
     super(bodyData, paramsData, queryData, headersData, methodData, urlData, ipData, cookieHeader)
     this.rawRequest = rawRequest
     this.rawResponse = rawResponse
@@ -73,7 +61,7 @@ class PeaqueRequestImplWithWebSocket extends PeaqueRequestImpl {
   }
 
   isUpgradeRequest(): boolean {
-    return this.rawRequest?.headers.upgrade === 'websocket'
+    return this.rawRequest?.headers.upgrade === "websocket"
   }
 
   isWebSocketUpgraded(): boolean {
@@ -82,11 +70,11 @@ class PeaqueRequestImplWithWebSocket extends PeaqueRequestImpl {
 
   upgradeToWebSocket(handler: WebSocketHandler): PeaqueWebSocket {
     if (!this.rawRequest || !this.rawResponse || !this.server) {
-      throw new Error('WebSocket upgrade not available - missing raw request/response/server')
+      throw new Error("WebSocket upgrade not available - missing raw request/response/server")
     }
 
     if (!this.isUpgradeRequest()) {
-      throw new Error('Not a WebSocket upgrade request')
+      throw new Error("Not a WebSocket upgrade request")
     }
 
     this.wsUpgraded = true
@@ -104,11 +92,11 @@ export class HttpServer {
 
   handleWebSocketUpgrade(req: http.IncomingMessage, res: http.ServerResponse, handler: WebSocketHandler): PeaqueWebSocket {
     if (!this.wss) {
-      throw new Error('WebSocket server not initialized')
+      throw new Error("WebSocket server not initialized")
     }
 
     const remoteAddr = req.socket.remoteAddress || ""
-    
+
     // Create a deferred WebSocket that will be connected after upgrade
     const deferredWs = new DeferredPeaqueWebSocket(remoteAddr)
 
@@ -117,19 +105,19 @@ export class HttpServer {
       deferredWs.connect(ws)
 
       // Set up event handlers
-      ws.on('message', (message: string | Buffer) => {
+      ws.on("message", (message: string | Buffer) => {
         if (handler.onMessage) {
           handler.onMessage(message, deferredWs)
         }
       })
 
-      ws.on('close', (code: number, reason: Buffer) => {
+      ws.on("close", (code: number, reason: Buffer) => {
         if (handler.onClose) {
           handler.onClose(code, reason.toString(), deferredWs)
         }
       })
 
-      ws.on('error', (error: Error) => {
+      ws.on("error", (error: Error) => {
         if (handler.onError) {
           handler.onError(error.message, deferredWs)
         }
@@ -143,25 +131,23 @@ export class HttpServer {
   }
 
   startServer(port: number): void {
-    // create a basic HTTP server that uses the router to handle requests
     const server = http.createServer(async (req: http.IncomingMessage, res: http.ServerResponse) => {
-      // First, try to find a matching route to get parameters
       const url = req.url || "/"
       const matchingRoute = this.router.getMatchingRoute(req.method as HttpMethod, url)
 
       if (!matchingRoute) {
         // Fallback 404 error
         res.statusCode = 404
-        res.setHeader('Content-Type', 'text/plain')
+        res.setHeader("Content-Type", "text/plain")
         res.end("404 Not Found")
       } else {
         // Parse query parameters from URL
-        const urlObj = new URL(url, `http://${req.headers.host || 'localhost'}`)
+        const urlObj = new URL(url, `http://${req.headers.host || "localhost"}`)
         const queryParams: Record<string, string | string[]> = {}
         for (const [key, value] of urlObj.searchParams.entries()) {
           if (queryParams[key]) {
             if (Array.isArray(queryParams[key])) {
-              (queryParams[key] as string[]).push(value)
+              ;(queryParams[key] as string[]).push(value)
             } else {
               queryParams[key] = [queryParams[key] as string, value]
             }
@@ -198,7 +184,7 @@ export class HttpServer {
         if (!peaqueReq.isWebSocketUpgraded()) {
           // send the response
           res.statusCode = peaqueReq.statusCode
-          res.setHeader('Content-Type', peaqueReq.contentType)
+          res.setHeader("Content-Type", peaqueReq.contentType)
           for (const [key, values] of Object.entries(peaqueReq.headersData)) {
             for (const value of values) {
               res.setHeader(key, value)
@@ -220,3 +206,10 @@ export class HttpServer {
     console.log(`🚀 HTTP server started on port ${port}`)
   }
 }
+
+/// http server todo
+/// - parse body data into parameters when content-type is application/x-www-form-urlencoded
+/// - parse body data into json when content-type is application/json
+/// - support multipart/form-data for file uploads, adding file(name:string): FileUpload to PeaqueRequest
+/// - support fallbacks for 404 and 500 errors with custom handlers
+/// - add a handler for static files that is efficient
