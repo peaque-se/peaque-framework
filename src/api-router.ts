@@ -1,4 +1,4 @@
-import type { CookieJar, CookieOptions, HttpMethod, PeaqueRequest, RouteHandler } from "./public-types";
+import type { CookieJar, CookieOptions, HttpMethod, PeaqueRequest, RouteHandler, WebSocketHandler, PeaqueWebSocket } from "./public-types";
 
 // Implementation of a simple CookieJar to manage cookies in requests and responses
 export class CookieJarImpl implements CookieJar {
@@ -174,6 +174,17 @@ export class PeaqueRequestImpl implements PeaqueRequest {
     this.statusCode = code;
     this.header('Location', url);
     this.sendData = `Redirecting to ${url}`; // Optional body for redirect?!
+  }
+
+  // WebSocket methods - basic implementation for compatibility
+  isUpgradeRequest(): boolean {
+    // This should be overridden by specific server implementations
+    return false;
+  }
+
+  upgradeToWebSocket(handler: WebSocketHandler): PeaqueWebSocket {
+    // This should be overridden by specific server implementations
+    throw new Error('WebSocket upgrade not supported in this implementation');
   }
 }
 
