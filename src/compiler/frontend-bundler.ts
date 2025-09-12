@@ -184,11 +184,11 @@ export async function bundleFrontend(options: FrontendBuildOptions): Promise<Fro
       jsxImportSource: 'react',
       alias: defaultAliases,
       external: [
-        'react',
-        'react-dom',
+//        'react',
+//        'react-dom',
         ...external
       ],
-      packages: 'external', // Keep node_modules external for performance
+//      packages: 'external', // Keep node_modules external for performance
       logLevel: 'silent' // We'll handle errors ourselves
     };
 

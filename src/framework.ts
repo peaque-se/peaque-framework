@@ -6,7 +6,7 @@ import { FrameworkConfig } from './api-router.js';
 import { createPeaqueRequestFromFastify, writePeaqueRequestToFastify } from './fastify.js';
 import { HeadManager } from './head-manager.js';
 import { MiddlewareSystem } from './middleware-system.js';
-import { RouteHandler } from './public-types.js';
+import { RequestHandler } from './public-types.js';
 import { Router } from './router.js';
 import { TailwindUtils } from './tailwind.js';
 
@@ -19,7 +19,7 @@ export class PeaqueFramework {
   private headManager: HeadManager;
   private config: Required<FrameworkConfig>;
   private isDev: boolean;
-  private routeHandlers: Map<string, RouteHandler> = new Map();
+  private routeHandlers: Map<string, RequestHandler> = new Map();
   private middlewareSystem: MiddlewareSystem = new MiddlewareSystem();
   private t0: number;
 

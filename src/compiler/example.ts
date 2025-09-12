@@ -1,13 +1,12 @@
 import * as fs from "fs"
 import * as path from "path"
-import { fileURLToPath } from 'url'
 import { bundleBackendProgram } from "./backend-bundler"
 import { generateBackendProgram } from "./backend-generator"
 import { bundleContentProdToString } from "./frontend-bundler"
 import { generateMainFile } from "./frontend-generator"
 import { bundleCssFile } from "./tailwind-bundler"
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
+import { mkdirSync, writeFileSync } from "fs";
+import { join } from "path";
 
 const basePath = "c:/projects/peaque-claude-experiments/peaque-manager-coach"
 console.time("Generate _main.tsx")
@@ -44,22 +43,53 @@ console.log("✅ Bundled CSS size:", result.length)
 console.time("Backend generation time")
 const backend = await generateBackendProgram({
   baseDir: basePath,
-  importPrefix: "./src/",
-  frameworkPath: path.join(__dirname, "..")
+  importPrefix: "../src/",
 })
 console.timeEnd("Backend generation time")
-console.log("✅ Generated backend program")
+
+// // save backend to .peaque/server.ts for inspection
+const backendTsPath = path.join(basePath, ".peaque/server-entry.ts")
+fs.writeFileSync(backendTsPath, backend, "utf-8")
+// console.log("✅ Saved generated backend to:", backendTsPath)
+
 
 // Bundle the backend program into a single executable file
 console.time("Backend bundling time")
-const outputBundlePath = path.join(basePath, ".peaque/server.js")
-
-await bundleBackendProgram({
-  generatedCode: backend,
-  outputPath: outputBundlePath,
+const backendBundleResult = await bundleBackendProgram({
+  inputFile: backendTsPath,
   baseDir: basePath,
+  outfile: path.join(process.cwd(), "dist-prod", "server.cjs"),
   minify: false,
   sourcemap: true
 })
 console.timeEnd("Backend bundling time")
-console.log("✅ Bundled backend to:", outputBundlePath)
+console.log("✅ Bundled backend successfully")
+console.log(`📦 Bundle written to: ${backendBundleResult.outfile}`)
+
+if (backendBundleResult.warnings.length > 0) {
+  console.log("⚠️  Build warnings:", backendBundleResult.warnings.length)
+}
+
+// create ./dist-prod folder and write (server.js there)
+// create ./dist-prod/assets folder and write (bundle.js, bundle.css, etc there)
+const distProdPath = join(process.cwd(), "dist-prod");
+const assetsPath = join(distProdPath, "assets");
+
+// Create dist-prod directory
+mkdirSync(distProdPath, { recursive: true });
+
+// Server is already written by the bundler
+// writeFileSync(join(distProdPath, "server.cjs"), backendBundleResult.code, "utf-8");
+
+// Create assets directory
+mkdirSync(assetsPath, { recursive: true });
+
+// Write bundle.js
+if (res.bundleContent) {
+  writeFileSync(join(assetsPath, "bundle.js"), res.bundleContent, "utf-8");
+}
+
+// Write bundle.css
+writeFileSync(join(assetsPath, "bundle.css"), result, "utf-8");
+
+console.log("✅ Files written to dist-prod");

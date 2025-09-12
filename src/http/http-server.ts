@@ -1,8 +1,8 @@
 import http from "http"
 import { WebSocket, WebSocketServer } from "ws"
 import { PeaqueRequestImpl } from "../api-router"
-import { Router } from "./http-router"
-import { HttpMethod, PeaqueWebSocket, WebSocketHandler } from "./http-types"
+import { parseRequestBody } from "./http-bodyparser"
+import { HttpMethod, PeaqueWebSocket, RequestHandler, WebSocketHandler } from "./http-types"
 
 class DeferredPeaqueWebSocket implements PeaqueWebSocket {
   private ws?: WebSocket
@@ -53,8 +53,8 @@ class PeaqueRequestImplWithWebSocket extends PeaqueRequestImpl {
   private rawResponse?: http.ServerResponse
   private server?: HttpServer
 
-  constructor(bodyData: any, paramsData: Record<string, string>, queryData: Record<string, string | string[]>, headersData: Record<string, string | string[]>, methodData: HttpMethod, urlData: string, ipData: string, cookieHeader: string | undefined, rawRequest?: http.IncomingMessage, rawResponse?: http.ServerResponse, server?: HttpServer) {
-    super(bodyData, paramsData, queryData, headersData, methodData, urlData, ipData, cookieHeader)
+  constructor(bodyData: any, paramsData: Record<string, string>, queryData: Record<string, string | string[]>, headersData: Record<string, string | string[]>, methodData: HttpMethod, pathData: string, originalUrlData: string, ipData: string, cookieHeader: string | undefined, rawRequest?: http.IncomingMessage, rawResponse?: http.ServerResponse, server?: HttpServer) {
+    super(bodyData, paramsData, queryData, headersData, methodData, pathData, originalUrlData, ipData, cookieHeader)
     this.rawRequest = rawRequest
     this.rawResponse = rawResponse
     this.server = server
@@ -69,6 +69,7 @@ class PeaqueRequestImplWithWebSocket extends PeaqueRequestImpl {
   }
 
   upgradeToWebSocket(handler: WebSocketHandler): PeaqueWebSocket {
+    this.responded = true
     if (!this.rawRequest || !this.rawResponse || !this.server) {
       throw new Error("WebSocket upgrade not available - missing raw request/response/server")
     }
@@ -83,11 +84,11 @@ class PeaqueRequestImplWithWebSocket extends PeaqueRequestImpl {
 }
 
 export class HttpServer {
-  private router: Router
+  private handler: RequestHandler
   private wss?: WebSocketServer
 
-  constructor(router: Router) {
-    this.router = router
+  constructor(handler: RequestHandler) {
+    this.handler = handler
   }
 
   handleWebSocketUpgrade(req: http.IncomingMessage, res: http.ServerResponse, handler: WebSocketHandler): PeaqueWebSocket {
@@ -122,9 +123,6 @@ export class HttpServer {
           handler.onError(error.message, deferredWs)
         }
       })
-
-      // WebSocket connection is now established
-      console.log(`🔌 WebSocket connection established from ${remoteAddr}`)
     })
 
     return deferredWs
@@ -133,68 +131,78 @@ export class HttpServer {
   startServer(port: number): void {
     const server = http.createServer(async (req: http.IncomingMessage, res: http.ServerResponse) => {
       const url = req.url || "/"
-      const matchingRoute = this.router.getMatchingRoute(req.method as HttpMethod, url)
-
-      if (!matchingRoute) {
-        // Fallback 404 error
-        res.statusCode = 404
-        res.setHeader("Content-Type", "text/plain")
-        res.end("404 Not Found")
-      } else {
-        // Parse query parameters from URL
-        const urlObj = new URL(url, `http://${req.headers.host || "localhost"}`)
-        const queryParams: Record<string, string | string[]> = {}
-        for (const [key, value] of urlObj.searchParams.entries()) {
-          if (queryParams[key]) {
-            if (Array.isArray(queryParams[key])) {
-              ;(queryParams[key] as string[]).push(value)
-            } else {
-              queryParams[key] = [queryParams[key] as string, value]
-            }
+      const requestPath = url.split("?")[0]
+      // Parse query parameters from URL
+      const urlObj = new URL(url, `http://${req.headers.host || "localhost"}`)
+      const queryParams: Record<string, string | string[]> = {}
+      for (const [key, value] of urlObj.searchParams.entries()) {
+        if (queryParams[key]) {
+          if (Array.isArray(queryParams[key])) {
+            ;(queryParams[key] as string[]).push(value)
           } else {
-            queryParams[key] = value
+            queryParams[key] = [queryParams[key] as string, value]
+          }
+        } else {
+          queryParams[key] = value
+        }
+      }
+
+      // Parse request body
+      const bodyResult = await parseRequestBody(req, queryParams)
+      const finalQueryParams = bodyResult.updatedQueryParams
+
+      // Convert headers to the expected format
+      const headers: Record<string, string | string[]> = {}
+      for (const [key, value] of Object.entries(req.headers)) {
+        if (value !== undefined) {
+          headers[key] = value
+        }
+      }
+
+      const peaqueReq: PeaqueRequestImplWithWebSocket = new PeaqueRequestImplWithWebSocket(
+        bodyResult.body, // parsed body data
+        {}, // params - now includes path parameters from route
+        finalQueryParams, // query - includes URL params and form data
+        headers, // headers
+        req.method as HttpMethod,
+        requestPath,
+        url, // originalUrl
+        req.socket.remoteAddress || "",
+        req.headers.cookie,
+        req, // pass the raw request for WebSocket upgrade
+        res, // pass the raw response
+        this // pass the server instance for WebSocket management
+      )
+
+      await this.handler(peaqueReq)
+
+      if (!peaqueReq.isResponded()) {
+        // No route matched and no response sent - return 404 by default
+        peaqueReq.code(404).type("text/plain").send("404 - Not Found")
+      }
+
+      // Only send response if WebSocket upgrade didn't happen
+      if (!peaqueReq.isWebSocketUpgraded()) {
+        // send the response
+        res.statusCode = peaqueReq.statusCode
+        res.setHeader("Content-Type", peaqueReq.contentType)
+        for (const [key, values] of Object.entries(peaqueReq.headersData)) {
+          for (const value of values) {
+            res.setHeader(key, value)
           }
         }
-
-        // Convert headers to the expected format
-        const headers: Record<string, string | string[]> = {}
-        for (const [key, value] of Object.entries(req.headers)) {
-          if (value !== undefined) {
-            headers[key] = value
-          }
-        }
-
-        const peaqueReq: PeaqueRequestImplWithWebSocket = new PeaqueRequestImplWithWebSocket(
-          {}, // body - would need body parser middleware for actual body data
-          matchingRoute.parameters || {}, // params - now includes path parameters from route
-          queryParams, // query
-          headers, // headers
-          req.method as HttpMethod,
-          url,
-          req.socket.remoteAddress || "",
-          req.headers.cookie,
-          req, // pass the raw request for WebSocket upgrade
-          res, // pass the raw response
-          this // pass the server instance for WebSocket management
-        )
-
-        await matchingRoute.handler(peaqueReq)
-
-        // Only send response if WebSocket upgrade didn't happen
-        if (!peaqueReq.isWebSocketUpgraded()) {
-          // send the response
-          res.statusCode = peaqueReq.statusCode
-          res.setHeader("Content-Type", peaqueReq.contentType)
-          for (const [key, values] of Object.entries(peaqueReq.headersData)) {
-            for (const value of values) {
-              res.setHeader(key, value)
-            }
-          }
-          if (peaqueReq.sendData !== undefined) {
-            res.end(typeof peaqueReq.sendData === "string" ? peaqueReq.sendData : JSON.stringify(peaqueReq.sendData))
+        if (peaqueReq.sendData !== undefined) {
+          // handle different types of sendData (plain text, JSON, Buffer)
+          if (typeof peaqueReq.sendData === "string") {
+            res.end(peaqueReq.sendData)
+          } else if (Buffer.isBuffer(peaqueReq.sendData)) {
+            //res.setHeader("Content-Type", "application/octet-stream")
+            res.end(peaqueReq.sendData)
           } else {
-            res.end()
+            res.end(JSON.stringify(peaqueReq.sendData))
           }
+        } else {
+          res.end()
         }
       }
     })
@@ -208,8 +216,8 @@ export class HttpServer {
 }
 
 /// http server todo
-/// - parse body data into parameters when content-type is application/x-www-form-urlencoded
-/// - parse body data into json when content-type is application/json
-/// - support multipart/form-data for file uploads, adding file(name:string): FileUpload to PeaqueRequest
-/// - support fallbacks for 404 and 500 errors with custom handlers
-/// - add a handler for static files that is efficient
+/// - [x] parse body data into parameters when content-type is application/x-www-form-urlencoded
+/// - [x] parse body data into json when content-type is application/json
+/// - [ ] support multipart/form-data for file uploads, adding file(name:string): FileUpload to PeaqueRequest
+/// - [ ] support fallbacks for 404 and 500 errors with custom handlers
+/// - [x] add a handler for static files that is efficient

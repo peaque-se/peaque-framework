@@ -3,7 +3,9 @@ import { CookieJarImpl, PeaqueRequestImpl } from "./api-router.js"
 import type { HttpMethod, PeaqueRequest } from "./public-types.js"
 
 export function createPeaqueRequestFromFastify(req: FastifyRequest): PeaqueRequest {
-  return new PeaqueRequestImpl(req.body, req.params as Record<string, string>, req.query as Record<string, string | string[]>, req.headers as Record<string, string | string[]>, req.method as HttpMethod, req.url, req.ip, req.headers.cookie)
+  const url = req.raw.url || "/"
+  const requestPath = url.split("?")[0] || "/"
+  return new PeaqueRequestImpl(req.body, req.params as Record<string, string>, req.query as Record<string, string | string[]>, req.headers as Record<string, string | string[]>, req.method as HttpMethod, requestPath, url, req.ip, req.headers.cookie)
 }
 
 export function writePeaqueRequestToFastify(request: PeaqueRequest, reply: FastifyReply) {

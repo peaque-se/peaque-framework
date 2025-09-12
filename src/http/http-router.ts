@@ -1,20 +1,22 @@
-import { PeaqueRequest, MatchingRoute } from "./http-types"
+import { MatchingRoute, RequestHandler, RequestMiddleware, PeaqueRequest } from "./http-types"
 import { HttpMethod } from "./http-types"
 
 class RouteNode {
   children: Map<string, RouteNode> = new Map()
   paramChild?: { name: string; node: RouteNode }
-  handler?: (req: PeaqueRequest) => Promise<void> | void
+  handler?: RequestHandler
   originalPath?: string
+  middleware: RequestMiddleware[] = [] // Middleware stack for this route
 }
 
 export class Router {
   private routes: Map<HttpMethod, RouteNode> = new Map()
+  private middlewareStack: RequestMiddleware[] = [] // Global middleware stack
 
   // add a route to the router. the path can contain parameters like /api/user/:id/list
   // e.g. /api/user/:userId/post/:postId
   // the parameters will be extracted and returned in the MatchingRoute object
-  addRoute(method: HttpMethod, path: string, handler: (req: PeaqueRequest) => Promise<void> | void) {
+  addRoute(method: HttpMethod, path: string, handler: RequestHandler) : Router {
     if (!this.routes.has(method)) {
       this.routes.set(method, new RouteNode())
     }
@@ -37,6 +39,18 @@ export class Router {
     }
     current.handler = handler
     current.originalPath = path
+    current.middleware = [...this.middlewareStack] // Copy current middleware stack
+    return this
+  }
+
+  // Add middleware to the stack that will be applied to subsequent routes
+  use(middleware: RequestMiddleware): Router {
+    const newRouter = new Router()
+    // Share the same route tree
+    newRouter.routes = this.routes
+    // Copy the middleware stack and add the new middleware
+    newRouter.middlewareStack = [...this.middlewareStack, middleware]
+    return newRouter
   }
 
   getMatchingRoute(method: HttpMethod, path: string): MatchingRoute | undefined {
@@ -61,12 +75,53 @@ export class Router {
         path: current.originalPath!,
         parameters: params,
         handler: current.handler,
+        middleware: current.middleware,
       }
     }
     return undefined
   }
 
+  getRequestHandler() : RequestHandler {
+    return async (req) => {
+      const method = req.method()
+      const path = req.path()
+      const matchingRoute = this.getMatchingRoute(method, path)
+      if (matchingRoute) {
+        for (const [key, value] of Object.entries(matchingRoute.parameters)) {
+          req.setPathParam(key, value)
+        }
+        
+        // Use middleware from the matching route (no second tree traversal needed)
+        if (matchingRoute.middleware.length > 0) {
+          // Execute middleware chain
+          await this.executeMiddlewareChain(req, matchingRoute.middleware, matchingRoute.handler)
+        } else {
+          // No middleware, call handler directly
+          return await matchingRoute.handler(req)
+        }
+      }
+    }
+  }
+
+  // Execute middleware chain
+  private async executeMiddlewareChain(req: PeaqueRequest, middleware: RequestMiddleware[], finalHandler: RequestHandler): Promise<void> {
+    let index = 0
+    
+    const next = async (): Promise<void> => {
+      if (index < middleware.length) {
+        const currentMiddleware = middleware[index]
+        index++
+        await currentMiddleware(req, next)
+      } else {
+        await finalHandler(req)
+      }
+    }
+    
+    await next()
+  }
+
   reset(): void {
-    this.routes.clear()
+    // Only reset this instance's middleware stack, keep shared routes
+    this.middlewareStack = []
   }
 }

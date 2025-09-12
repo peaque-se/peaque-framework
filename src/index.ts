@@ -25,7 +25,7 @@ export type {
 // API Router Types
 export type {
   PeaqueRequest,
-  RouteHandler,
+  RequestHandler,
   HttpMethod,
   CookieOptions,
   CookieJar,

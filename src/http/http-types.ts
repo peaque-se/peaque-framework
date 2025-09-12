@@ -1,59 +1,71 @@
+// Framework types that represent a HTTP request and reply
+
+export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'OPTIONS' | 'HEAD'
+
+export interface RequestHandler {
+  (req: PeaqueRequest): Promise<void> | void
+}
+
+export interface RequestMiddleware {
+  (req: PeaqueRequest, next: RequestHandler): Promise<void> | void
+}
+
+export interface PeaqueRequest {
+  body<T=any>(): T
+  isResponded(): boolean
+  path():string
+  setPath(path: string): void
+  param(name: string): string | undefined // first value of path params and query params
+  paramNames(): string[] // all parameter names from path and query params
+  pathParam(name: string): string | undefined // path param only, first value
+  setPathParam(name: string, value: string): void // set path param value
+  queryParam(name: string): string | undefined // query param only, first value
+  setQueryParam(name: string, value: string[]): void // set query param value
+  queryParamValues(name: string): string[] | undefined // query param only, all values
+  requestHeader(name: string): string | undefined // header only
+  requestHeaderValues(name: string): string[] | undefined // all header values
+  method(): HttpMethod
+  originalUrl(): string
+  ip(): string
+  cookies(): CookieJar
+
+  code(statusCode: number): PeaqueRequest
+  header(name: string, value: string): PeaqueRequest
+  type(contentType: string): PeaqueRequest
+  send<T=any>(data?: T): void
+  redirect(url: string, code?: number): void
+  
+  // WebSocket upgrade support
+  isUpgradeRequest(): boolean
+  upgradeToWebSocket(handler: WebSocketHandler): PeaqueWebSocket
+}
+
 // Cookie jar interface for managing cookies
 export interface CookieOptions {
-  maxAge?: number;
-  expires?: Date;
-  path?: string;
-  domain?: string;
-  secure?: boolean;
-  httpOnly?: boolean;
-  sameSite?: 'strict' | 'lax' | 'none';
+  maxAge?: number
+  expires?: Date
+  path?: string
+  domain?: string
+  secure?: boolean
+  httpOnly?: boolean
+  sameSite?: 'strict' | 'lax' | 'none'
 }
 
 export interface CookieJar {
-  get(name: string): string | undefined;
-  getAll(): Record<string, string>;
-  set(name: string, value: string, options?: CookieOptions): void;
-  remove(name: string, options?: CookieOptions): void;
+  get(name: string): string | undefined
+  getAll(): Record<string, string>
+  set(name: string, value: string, options?: CookieOptions): void
+  remove(name: string, options?: CookieOptions): void
 }
 
-// Framework types that represent a HTTP request and reply
-
-export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'OPTIONS' | 'HEAD';
-
-export interface PeaqueRequest {
-  body<T=any>(): T;
-  param(name: string): string | undefined; // first value of path params and query params
-  pathParam(name: string): string | undefined; // path param only, first value
-  queryParam(name: string): string | undefined; // query param only, first value
-  queryParamValues(name: string): string[] | undefined; // query param only, all values
-  requestHeader(name: string): string | undefined; // header only
-  requestHeaderValues(name: string): string[] | undefined; // all header values
-  method(): HttpMethod;
-  url(): string;
-  ip(): string;
-  cookies(): CookieJar;
-
-  code(statusCode: number): PeaqueRequest;
-  header(name: string, value: string): PeaqueRequest;
-  send<T=any>(data?: T): void;
-  type(contentType: string): PeaqueRequest;
-  redirect(url: string, code?: number): void;
-  
-  // WebSocket upgrade support
-  isUpgradeRequest(): boolean;
-  upgradeToWebSocket(handler: WebSocketHandler): PeaqueWebSocket;
-}
-
-export interface RouteHandler {
-  (req: PeaqueRequest): Promise<void> | void;
-}
 
 // HTTP routing types
 export type MatchingRoute = {
   method: HttpMethod
   path: string
   parameters: Record<string, string>
-  handler: (req: PeaqueRequest) => Promise<void> | void
+  handler: RequestHandler
+  middleware: RequestMiddleware[]
 }
 
 // WebSocket types
@@ -82,57 +94,57 @@ export type WebSocketHandler = {
 // Head management types for custom meta tags, icons, and head elements
 
 export interface MetaTag {
-  name?: string;
-  property?: string;
-  httpEquiv?: string;
-  content: string;
-  charset?: string;
+  name?: string
+  property?: string
+  httpEquiv?: string
+  content: string
+  charset?: string
 }
 
 export interface LinkTag {
-  rel: string;
-  href: string;
-  type?: string;
-  sizes?: string;
-  media?: string;
-  crossOrigin?: string;
-  integrity?: string;
-  as?: 'document' | 'font' | 'image' | 'script' | 'style' | 'video' | 'audio' | 'fetch' | 'worker' | 'embed' | 'object' | 'track';
+  rel: string
+  href: string
+  type?: string
+  sizes?: string
+  media?: string
+  crossOrigin?: string
+  integrity?: string
+  as?: 'document' | 'font' | 'image' | 'script' | 'style' | 'video' | 'audio' | 'fetch' | 'worker' | 'embed' | 'object' | 'track'
 }
 
 export interface ScriptTag {
-  src?: string;
-  type?: string;
-  async?: boolean;
-  defer?: boolean;
-  crossOrigin?: string;
-  integrity?: string;
-  innerHTML?: string;
+  src?: string
+  type?: string
+  async?: boolean
+  defer?: boolean
+  crossOrigin?: string
+  integrity?: string
+  innerHTML?: string
 }
 
 export interface IconConfig {
-  rel: 'icon' | 'apple-touch-icon' | 'shortcut icon' | 'mask-icon';
-  href: string;
-  sizes?: string;
-  type?: string;
-  color?: string;
+  rel: 'icon' | 'apple-touch-icon' | 'shortcut icon' | 'mask-icon'
+  href: string
+  sizes?: string
+  type?: string
+  color?: string
 }
 
 export interface HeadConfig {
-  title?: string;
-  description?: string;
-  keywords?: string;
-  author?: string;
-  viewport?: string;
-  charset?: string;
-  icons?: IconConfig[];
-  meta?: MetaTag[];
-  links?: LinkTag[];
-  scripts?: ScriptTag[];
+  title?: string
+  description?: string
+  keywords?: string
+  author?: string
+  viewport?: string
+  charset?: string
+  icons?: IconConfig[]
+  meta?: MetaTag[]
+  links?: LinkTag[]
+  scripts?: ScriptTag[]
 }
 
 export interface ResolvedHeadConfig extends HeadConfig {
   // Additional properties added during resolution
-  _filePath?: string;
-  _priority?: number;
+  _filePath?: string
+  _priority?: number
 }

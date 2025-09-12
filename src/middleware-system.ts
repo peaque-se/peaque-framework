@@ -1,4 +1,4 @@
-import { RouteHandler } from './public-types.js';
+import { RequestHandler } from './public-types.js';
 import path from 'path';
 import { importWithTsPaths } from './route-import.js';
 
@@ -63,7 +63,7 @@ export class MiddlewareSystem {
   }
 
   // Apply middleware chain to a handler (outermost first)
-  applyMiddleware(handler: RouteHandler, middlewares: MiddlewareFunction[]): RouteHandler {
+  applyMiddleware(handler: RequestHandler, middlewares: MiddlewareFunction[]): RequestHandler {
     return async (request: any) => {
       // Run middleware functions in order (outermost to innermost)
       for (const middleware of middlewares) {
@@ -81,7 +81,7 @@ export class MiddlewareSystem {
   }
 
   // Convenience method to get middleware-wrapped handler for a route
-  wrapHandler(routePath: string, handler: RouteHandler): RouteHandler {
+  wrapHandler(routePath: string, handler: RequestHandler): RequestHandler {
     const middlewares = this.getMiddlewareForRoute(routePath);
     return this.applyMiddleware(handler, middlewares);
   }

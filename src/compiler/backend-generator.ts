@@ -6,22 +6,19 @@
 /// - support for middleware.ts files
 ///
 
+import * as fs from 'fs';
 import { glob } from 'glob';
 import * as path from 'path';
-import * as fs from 'fs';
 import { HttpMethod } from '../http/http-types';
-import { exit } from 'process';
 
 // baseDir is the root of the Peaque project, default to process.cwd()
 // route files are expected in baseDir/src/api
 export async function generateBackendProgram(options: {
   baseDir?: string // default to process.cwd()
   importPrefix?: string // default to "../src/"
-  frameworkPath?: string // path to the framework's src directory
 }): Promise<string> {
   const baseDir = options.baseDir || process.cwd()
   const importPrefix = options.importPrefix || "../src/"
-  const frameworkPath = options.frameworkPath || path.join(__dirname, '..')
 
   const apiDir = path.join(baseDir, 'src', 'api')
 
@@ -69,8 +66,7 @@ export async function generateBackendProgram(options: {
 
   // Generate the complete output
   const imports = [
-    `import { Router } from "${path.join(frameworkPath, 'http/http-router').replace(/\\/g, '/')}"`,
-    `import { HttpServer } from "${path.join(frameworkPath, 'http/http-server').replace(/\\/g, '/')}"`,
+    `import { Router, HttpServer } from "@peaque/framework/server"`,
     ...routeImports
   ].join('\n')
 
@@ -84,8 +80,6 @@ export async function generateBackendProgram(options: {
   ].join('\n')
 
   const startupFunction = [
-    `import { HttpServer } from "${path.join(frameworkPath, 'http/http-server').replace(/\\/g, '/')}"`,
-    '',
     'const router = makeBackendRouter()',
     'const server = new HttpServer(router)',
     'server.startServer(3000)'

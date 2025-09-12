@@ -1,7 +1,7 @@
 import { glob } from 'glob';
 import path from 'path';
 import { RouteDefinition } from './api-router.js';
-import { HeadConfig, HttpMethod, RouteHandler } from './public-types.js';
+import { HeadConfig, HttpMethod, RequestHandler } from './public-types.js';
 import { importWithTsPaths } from './route-import.js';
 
 export class Router {
@@ -195,13 +195,13 @@ export class Router {
     }
   }
 
-  private async loadRouteHandlers(filePath: string): Promise<Record<string, RouteHandler>> {
+  private async loadRouteHandlers(filePath: string): Promise<Record<string, RequestHandler>> {
     try {
       const fileUrl = `file://${filePath.replace(/\\/g, '/')}`;
       const module = await importWithTsPaths(fileUrl + '?t=' + Date.now(), {
         absWorkingDir: process.cwd(),
       });
-      const handlers: Record<string, RouteHandler> = {};
+      const handlers: Record<string, RequestHandler> = {};
 
       // Look for HTTP method exports
       const methods: HttpMethod[] = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS', 'HEAD'];

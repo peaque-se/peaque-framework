@@ -1,4 +1,4 @@
-import type { CookieJar, CookieOptions, HttpMethod, PeaqueRequest, RouteHandler, WebSocketHandler, PeaqueWebSocket } from "./public-types";
+import type { CookieJar, CookieOptions, HttpMethod, PeaqueRequest, RequestHandler, WebSocketHandler, PeaqueWebSocket } from "./public-types";
 
 // Implementation of a simple CookieJar to manage cookies in requests and responses
 export class CookieJarImpl implements CookieJar {
@@ -84,10 +84,12 @@ export class PeaqueRequestImpl implements PeaqueRequest {
   private queryData: Record<string, string | string[]>;
   private requestHeadersData: Record<string, string | string[]>;
   private methodData: HttpMethod
-  private urlData: string;
+  private pathData: string;
+  private originalUrlData: string;
   private ipData: string
   private cookieJar: CookieJarImpl;
 
+  responded = false;
   statusCode: number = 200;
   headersData: Record<string, string[]> = {};
   contentType: string = 'application/json';
@@ -99,7 +101,8 @@ export class PeaqueRequestImpl implements PeaqueRequest {
     queryData: Record<string, string | string[]>,
     headersData: Record<string, string | string[]>,
     methodData: HttpMethod,
-    urlData: string,
+    pathData: string,
+    originalUrlData: string,
     ipData: string,
     cookieHeader: string | undefined,
   ) {
@@ -108,7 +111,8 @@ export class PeaqueRequestImpl implements PeaqueRequest {
     this.queryData = queryData;
     this.requestHeadersData = headersData;
     this.methodData = methodData;
-    this.urlData = urlData;
+    this.pathData = pathData;
+    this.originalUrlData = originalUrlData;
     this.ipData = ipData;
     this.cookieJar = new CookieJarImpl(cookieHeader);
   }
@@ -119,12 +123,32 @@ export class PeaqueRequestImpl implements PeaqueRequest {
   param(name: string): string | undefined {
     return this.paramsData[name] || this.queryParam(name);
   }
+  paramNames(): string[] {
+    const paramNames = new Set<string>();
+    
+    // Add path parameter names
+    Object.keys(this.paramsData).forEach(name => paramNames.add(name));
+    
+    // Add query parameter names
+    Object.keys(this.queryData).forEach(name => paramNames.add(name));
+    
+    return Array.from(paramNames);
+  }
   pathParam(name: string): string | undefined {
     return this.paramsData[name];
+  }
+  setPathParam(name: string, value: string): void {
+    this.paramsData[name] = value;
   }
   queryParam(name: string): string | undefined {
     const value = this.queryData[name];
     return Array.isArray(value) ? value[0] : value;
+  }
+  setQueryParam(name: string, value: string[]): void {
+    this.queryData[name] = value;
+  }
+  isResponded(): boolean {
+    return this.responded;
   }
   queryParamValues(name: string): string[] | undefined {
     const value = this.queryData[name];
@@ -141,8 +165,14 @@ export class PeaqueRequestImpl implements PeaqueRequest {
   method(): HttpMethod {
     return this.methodData;
   }
-  url(): string {
-    return this.urlData;
+  path(): string {
+    return this.pathData;
+  }
+  setPath(path: string): void {
+    this.pathData = path;
+  }
+  originalUrl(): string {
+    return this.originalUrlData;
   }
   ip(): string {
     return this.ipData;
@@ -165,6 +195,7 @@ export class PeaqueRequestImpl implements PeaqueRequest {
   }
   send<T = any>(data?: T): void {
     this.sendData = data;
+    this.responded = true;
   }
   type(contentType: string): PeaqueRequest {
     this.contentType = contentType;
@@ -174,6 +205,7 @@ export class PeaqueRequestImpl implements PeaqueRequest {
     this.statusCode = code;
     this.header('Location', url);
     this.sendData = `Redirecting to ${url}`; // Optional body for redirect?!
+    this.responded = true;
   }
 
   // WebSocket upgrade support (not implemented in this basic request implementation)
@@ -189,7 +221,7 @@ export class PeaqueRequestImpl implements PeaqueRequest {
 export interface RouteDefinition {
   method: HttpMethod;
   path: string;
-  handler: RouteHandler;
+  handler: RequestHandler;
   filePath: string;
 }
 
