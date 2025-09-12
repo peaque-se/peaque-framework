@@ -1,9 +1,13 @@
-import { writeFile } from "fs/promises"
-import * as path from "path"
 import * as fs from "fs"
+import * as path from "path"
+import { fileURLToPath } from 'url'
+import { bundleBackendProgram } from "./backend-bundler"
+import { generateBackendProgram } from "./backend-generator"
 import { bundleContentProdToString } from "./frontend-bundler"
 import { generateMainFile } from "./frontend-generator"
 import { bundleCssFile } from "./tailwind-bundler"
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 const basePath = "c:/projects/peaque-claude-experiments/peaque-manager-coach"
 console.time("Generate _main.tsx")
@@ -36,7 +40,26 @@ const result = await bundleCssFile(cssContent, basePath)
 console.timeEnd("CSS bundle time")
 
 console.log("✅ Bundled CSS size:", result.length)
-// check if the result contains a class with 31337 in it
-if (result.includes("31337")) {
-  console.log("✅ Tailwind CSS processing looks good (found class with 31337)")
-}
+
+console.time("Backend generation time")
+const backend = await generateBackendProgram({
+  baseDir: basePath,
+  importPrefix: "./src/",
+  frameworkPath: path.join(__dirname, "..")
+})
+console.timeEnd("Backend generation time")
+console.log("✅ Generated backend program")
+
+// Bundle the backend program into a single executable file
+console.time("Backend bundling time")
+const outputBundlePath = path.join(basePath, ".peaque/server.js")
+
+await bundleBackendProgram({
+  generatedCode: backend,
+  outputPath: outputBundlePath,
+  baseDir: basePath,
+  minify: false,
+  sourcemap: true
+})
+console.timeEnd("Backend bundling time")
+console.log("✅ Bundled backend to:", outputBundlePath)
