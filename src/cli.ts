@@ -94,6 +94,7 @@ async function main() {
       const result = await framework.build();
       if (result.success) {
         console.log('✅ Build completed successfully');
+        process.exit(0);
       } else {
         console.error('❌ Build failed:');
         result.errors?.forEach(error => console.error(`  - ${error}`));
