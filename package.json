@@ -35,6 +35,8 @@
   },
   "dependencies": {
     "@esbuild-plugins/tsconfig-paths": "^0.1.2",
+    "@fastify/cookie": "^9.3.1",
+    "@fastify/formbody": "^7.4.0",
     "@fastify/static": "^6.12.0",
     "@tailwindcss/postcss": "^4.1.13",
     "autoprefixer": "^10.4.0",

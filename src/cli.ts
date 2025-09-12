@@ -39,7 +39,12 @@ function makeFramework(): PeaqueFramework {
     apiDir: path.join(cwd, 'src', 'api'),
     publicDir: path.join(cwd, 'src', 'public'),
     buildDir: path.join(cwd, '.peaque', 'dist'),
-    logger: verbose
+    logger: verbose,
+    betaAccess: {
+      enabled: true,
+      secret: "peaque-a-boo",
+      cookieName: "this-is-a-drill"
+    }
   };
 
   return new PeaqueFramework(config);

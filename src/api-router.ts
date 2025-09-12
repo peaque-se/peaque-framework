@@ -202,6 +202,11 @@ export interface FrameworkConfig {
   publicDir?: string;
   buildDir?: string;
   logger?: boolean | object;
+  betaAccess?: {
+    enabled?: boolean;
+    secret?: string;
+    cookieName?: string;
+  };
 }
 
 export interface BuildResult {

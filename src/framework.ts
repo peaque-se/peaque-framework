@@ -35,11 +35,16 @@ export class PeaqueFramework {
       apiDir: config.apiDir || './api',
       publicDir: config.publicDir || './public',
       buildDir: config.buildDir || './dist',
-      logger: config.logger !== undefined ? config.logger : this.isDev
+      logger: config.logger !== undefined ? config.logger : this.isDev,
+      betaAccess: config.betaAccess || { enabled: false, secret: 'thisisthesecretcode', cookieName: 'beta-user' }
     };
     this.fastify = Fastify({
       logger: this.config.logger
     });
+
+    // Register content type parsers
+    this.fastify.register(import('@fastify/formbody'));
+    this.fastify.register(import('@fastify/cookie'));
 
     this.router = new Router();
     this.headManager = new HeadManager();
@@ -59,6 +64,7 @@ export class PeaqueFramework {
       await this.setupHeadConfigurations();
       await this.copyHeadAssets(); // Copy icons to serve in dev mode
       await this.setupStaticFiles();
+      await this.setupBetaAccess(); // Setup beta access middleware
       await this.setupSPA();
 
       await this.fastify.listen({
@@ -294,6 +300,53 @@ export class PeaqueFramework {
     });
   }
 
+  private async setupBetaAccess(): Promise<void> {
+    if (!this.config.betaAccess?.enabled) {
+      return;
+    }
+
+    // Add preHandler hook to check beta access for all routes
+    this.fastify.addHook('preHandler', async (request: any, reply: any) => {
+      // Skip beta check for the beta verification endpoint
+      if (request.url === '/api/beta-verify' && request.method === 'POST') {
+        return;
+      }
+
+      // Check for beta cookie
+      const cookies = request.headers.cookie || '';
+      const hasBetaCookie = cookies.split(';').some((cookie: string) => {
+        const [name] = cookie.trim().split('=');
+        return name === this.config.betaAccess!.cookieName;
+      });
+
+      if (!hasBetaCookie) {
+        // Serve beta access page
+        const betaHtml = this.generateBetaAccessHTML();
+        reply.type('text/html').send(betaHtml);
+        return;
+      }
+    });
+
+    // Add beta verification route
+    this.fastify.post('/api/beta-verify', async (request: any, reply: any) => {
+      const { code } = request.body || {};
+
+      if (code === this.config.betaAccess!.secret) {
+        // Set the beta cookie and redirect
+        reply
+          .setCookie(this.config.betaAccess!.cookieName!, 'true', {
+            httpOnly: true,
+            path: '/',
+            maxAge: 60 * 60 * 24 * 30 // 30 days
+          })
+          .redirect('/');
+      } else {
+        // Invalid code, redirect back to beta page
+        reply.redirect('/');
+      }
+    });
+  }
+
   private generateDevHTML(routePath: string = '/'): string {
     const publicEnvVars = this.getPublicEnvVars();
     const envScript = this.generateEnvScript(publicEnvVars);
@@ -424,6 +477,86 @@ ${headHTML}
   <div id="peaque"></div>
   ${envScript}
   <script type="module" src="/peaque.js"></script>
+</body>
+</html>`;
+  }
+
+  private generateBetaAccessHTML(): string {
+    return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Beta Access Required</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .container {
+      background: white;
+      padding: 2rem;
+      border-radius: 10px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+      text-align: center;
+      max-width: 400px;
+      width: 90%;
+    }
+    h1 {
+      color: #333;
+      margin-bottom: 1rem;
+    }
+    p {
+      color: #666;
+      margin-bottom: 2rem;
+    }
+    form {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    input {
+      padding: 0.75rem;
+      border: 2px solid #e1e5e9;
+      border-radius: 5px;
+      font-size: 1rem;
+      transition: border-color 0.3s;
+    }
+    input:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+    button {
+      padding: 0.75rem;
+      background: #667eea;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+    button:hover {
+      background: #5a6fd8;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Beta Access Required</h1>
+    <p>Please enter the beta access code to continue.</p>
+    <form method="POST" action="/api/beta-verify">
+      <input type="text" name="code" placeholder="Enter beta code" required>
+      <button type="submit">Access Beta</button>
+    </form>
+  </div>
 </body>
 </html>`;
   }
