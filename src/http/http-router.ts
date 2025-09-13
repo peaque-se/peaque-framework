@@ -12,11 +12,10 @@ class RouteNode {
 export class Router {
   private routes: Map<HttpMethod, RouteNode> = new Map()
   private middlewareStack: RequestMiddleware[] = [] // Global middleware stack
-
   // add a route to the router. the path can contain parameters like /api/user/:id/list
   // e.g. /api/user/:userId/post/:postId
   // the parameters will be extracted and returned in the MatchingRoute object
-  addRoute(method: HttpMethod, path: string, handler: RequestHandler) : Router {
+  addRoute(method: HttpMethod, path: string, handler: RequestHandler): Router {
     if (!this.routes.has(method)) {
       this.routes.set(method, new RouteNode())
     }
@@ -81,7 +80,7 @@ export class Router {
     return undefined
   }
 
-  getRequestHandler() : RequestHandler {
+  getRequestHandler(): RequestHandler {
     return async (req) => {
       const method = req.method()
       const path = req.path()
@@ -90,38 +89,32 @@ export class Router {
         for (const [key, value] of Object.entries(matchingRoute.parameters)) {
           req.setPathParam(key, value)
         }
-        
-        // Use middleware from the matching route (no second tree traversal needed)
         if (matchingRoute.middleware.length > 0) {
-          // Execute middleware chain
-          await this.executeMiddlewareChain(req, matchingRoute.middleware, matchingRoute.handler)
+          await executeMiddlewareChain(req, matchingRoute.middleware, matchingRoute.handler)
         } else {
-          // No middleware, call handler directly
           return await matchingRoute.handler(req)
         }
       }
     }
   }
 
-  // Execute middleware chain
-  private async executeMiddlewareChain(req: PeaqueRequest, middleware: RequestMiddleware[], finalHandler: RequestHandler): Promise<void> {
-    let index = 0
-    
-    const next = async (): Promise<void> => {
-      if (index < middleware.length) {
-        const currentMiddleware = middleware[index]
-        index++
-        await currentMiddleware(req, next)
-      } else {
-        await finalHandler(req)
-      }
-    }
-    
-    await next()
-  }
-
   reset(): void {
     // Only reset this instance's middleware stack, keep shared routes
     this.middlewareStack = []
   }
+}
+
+export async function executeMiddlewareChain(req: PeaqueRequest, middleware: RequestMiddleware[], finalHandler: RequestHandler): Promise<void> {
+  let index = 0
+  const next = async (): Promise<void> => {
+    if (index < middleware.length) {
+      const currentMiddleware = middleware[index]
+      index++
+      await currentMiddleware(req, next)
+    } else {
+      await finalHandler(req)
+    }
+  }
+
+  await next()
 }

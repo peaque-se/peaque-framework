@@ -1,4 +1,4 @@
-import type { CookieJar, CookieOptions, HttpMethod, PeaqueRequest, RequestHandler, WebSocketHandler, PeaqueWebSocket } from "./public-types";
+import type { CookieJar, CookieOptions, HttpMethod, PeaqueRequest, PeaqueWebSocket, WebSocketHandler } from "./http-types.js";
 
 // Implementation of a simple CookieJar to manage cookies in requests and responses
 export class CookieJarImpl implements CookieJar {
@@ -207,42 +207,19 @@ export class PeaqueRequestImpl implements PeaqueRequest {
     this.sendData = `Redirecting to ${url}`; // Optional body for redirect?!
     this.responded = true;
   }
+  responseCode(): number {
+    return this.statusCode;
+  }
+  responseBody(): any {
+    return this.sendData;
+  }
 
   // WebSocket upgrade support (not implemented in this basic request implementation)
   isUpgradeRequest(): boolean {
     return false; // This implementation doesn't support WebSocket upgrades
   }
 
-  upgradeToWebSocket(handler: any): any {
+  upgradeToWebSocket(handler: WebSocketHandler): PeaqueWebSocket {
     throw new Error('WebSocket upgrade not supported in this request implementation');
   }
-}
-
-export interface RouteDefinition {
-  method: HttpMethod;
-  path: string;
-  handler: RequestHandler;
-  filePath: string;
-}
-
-export interface FrameworkConfig {
-  port?: number;
-  host?: string;
-  dev?: boolean;
-  pagesDir?: string;
-  apiDir?: string;
-  publicDir?: string;
-  buildDir?: string;
-  logger?: boolean | object;
-  betaAccess?: {
-    enabled?: boolean;
-    secret?: string;
-    cookieName?: string;
-  };
-}
-
-export interface BuildResult {
-  success: boolean;
-  errors?: string[];
-  warnings?: string[];
 }

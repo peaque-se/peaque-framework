@@ -183,7 +183,7 @@ export async function generateAndBundleBackend(options: {
   // Write the generated code to a temporary file
   const tempInputFile = path.join(options.baseDir || process.cwd(), '.peaque', 'server_temp.ts');
   fs.mkdirSync(path.dirname(tempInputFile), { recursive: true });
-  fs.writeFileSync(tempInputFile, generatedCode);
+  fs.writeFileSync(tempInputFile, generatedCode.content, 'utf-8');
 
   try {
     return await bundleBackendProgram({

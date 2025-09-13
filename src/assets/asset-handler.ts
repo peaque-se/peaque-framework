@@ -1,6 +1,6 @@
 // GET handler for serving static assets with compression support
 
-import { RequestHandler } from "../public-types"
+import { RequestHandler } from "../http/http-types"
 import { Router } from "../http/http-router"
 import { promises as fs } from "fs"
 import { join, extname, basename } from "path"

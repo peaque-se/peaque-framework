@@ -21,24 +21,16 @@ export type {
   SearchParams
 } from './client/router.js';
 
+export type {
+  HeadDefinition
+} from './client/head.js';
 
 // API Router Types
 export type {
   PeaqueRequest,
   RequestHandler,
+  RequestMiddleware,
   HttpMethod,
   CookieOptions,
   CookieJar,
-} from './public-types.js';
-
-// Head Management Types
-export type {
-  HeadConfig,
-  ResolvedHeadConfig,
-  MetaTag,
-  LinkTag,
-  ScriptTag,
-  IconConfig,
-} from './public-types.js';
-
-
+} from './http/http-types.js';

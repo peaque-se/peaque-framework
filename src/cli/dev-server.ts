@@ -1,122 +1,220 @@
-//const basePath = process.cwd()
-
-import path from "path"
-import * as fs from "fs"
-import { bundleContentDevToString } from "../compiler/frontend-bundler"
-import { generateMainFile } from "../compiler/frontend-generator"
-import { HttpServer, Router } from "../http"
-import { PeaqueWebSocket, RequestHandler } from "../public-types"
-import { bundleCssFile } from "../compiler/tailwind-bundler"
-import { addAssetRoutesForFolder } from "../assets/asset-handler"
 import chokidar from "chokidar"
-import { cwd } from "process"
+import { config } from "dotenv"
+import * as fs from "fs"
+import path from "path"
+import { addAssetRoutesForFolder } from "../assets/asset-handler"
+import { generateBackendProgram } from "../compiler/backend-generator"
+import { FrontendBundler } from "../compiler/frontend-bundler"
+import { buildPageRouter, generatePageRouterJS } from "../compiler/frontend-generator"
+import { bundleCssFile } from "../compiler/tailwind-bundler"
+import { HttpServer, Router } from "../http"
+import { HttpMethod, RequestHandler, RequestMiddleware } from "../http/http-types"
+import { importWithTsPaths } from "../hmr/import-file"
+import { getHmrClientJs, hmrConnectHandler, notifyConnectedClients } from "../hmr/hmr-handler"
+import { executeMiddlewareChain } from "../http/http-router"
 
-// temporarily override to a test project
-const basePath = "c:/projects/peaque-claude-experiments/peaque-manager-coach"
-const peaquePath = path.join(basePath, ".peaque/")
-const devPath = path.join(peaquePath, "dev/")
-const devAssets = path.join(devPath, "assets/")
-// create all folders if they don't exist
-fs.mkdirSync(devAssets, { recursive: true })
+export const runDevelopmentServer = async () => {
+  const basePath = process.cwd()
 
-let currentHandler: RequestHandler = async (req) => {
-  req.code(400).send("Application not ready")
-}
+  // make sure there is a @peaque/framework dependency in package.json
+  const pkgPath = path.join(basePath, "package.json")
+  if (!fs.existsSync(pkgPath)) {
+    throw new Error(`No package.json found in the current directory: ${basePath}`)
+  }
+  const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"))
+  if (!((pkg.dependencies && pkg.dependencies["@peaque/framework"]) || (pkg.devDependencies && pkg.devDependencies["@peaque/framework"]))) {
+    throw new Error(`No @peaque/framework dependency found in package.json. Please run "npm install @peaque/framework" or "yarn add @peaque/framework" in your project directory.`)
+  }
 
-const outermostHandler: RequestHandler = async (req) => {
-  currentHandler(req)
-}
+  // Create a reusable bundler instance for efficient rebuilds
+  const bundler = new FrontendBundler({
+    entryContent: "", // Will be set dynamically
+    baseDir: basePath,
+    writeToFile: false,
+    isDevelopment: true,
+    sourcemap: true,
+    minify: false,
+  })
+  const peaquePath = path.join(basePath, ".peaque/")
+  const devPath = path.join(peaquePath, "dev/")
+  const devAssets = path.join(devPath, "assets/")
+  // create all folders if they don't exist
+  fs.mkdirSync(devAssets, { recursive: true })
 
-const connectedClients = new Set<PeaqueWebSocket>()
+  let currentHandler: RequestHandler | null = null
+  const outermostHandler: RequestHandler = async (req) => {
+    return currentHandler?.(req)
+  }
 
-async function rebuildEverything() {
-  const startTime = Date.now()
-  // Create the client side router bundle
-  // prepend a definition of process.env.NODE_ENV
-  const jsPrefix = 'window.process = { env: { NODE_ENV: "development" } };'
-  const generatedPeaqueJs = await generateMainFile(basePath, true, "./src/")
-
-  const jsBundleResult = await bundleContentDevToString(generatedPeaqueJs, basePath)
-  fs.writeFileSync(path.join(devAssets, "peaque.js"), jsPrefix + jsBundleResult.bundleContent!, "utf-8")
-
-  // Create the css bundle
-  const stylePath = path.join(basePath, "src/styles.css")
-  const cssContent = fs.readFileSync(stylePath, "utf-8")
-  const result = await bundleCssFile(cssContent, basePath)
-  fs.writeFileSync(path.join(devAssets, "peaque.css"), result, "utf-8")
-
-  // Write the hmr-client.js
-  const hmrClientPath = path.join(cwd(), "src/client/hmr-client2.js")
-  const hmrClientContent = fs.readFileSync(hmrClientPath, "utf-8")
-  fs.writeFileSync(path.join(devAssets, "hmr_client.js"), hmrClientContent, "utf-8")
-
-  // create a basic index.html that loads the peaque.js and peaque.css
+  // prepare some js
+  const hmrClientContent = getHmrClientJs(3000)
+  const peaqueDevJsRoute: RequestHandler = async (req) => {
+    const devcontent = 'window.process = { env: { NODE_ENV: "development" } };' + "\n" + hmrClientContent + "\n"
+    req.type("application/javascript").send(devcontent)
+  }
   const indexHtml = `<!DOCTYPE html>
-  <html lang="en">
-  <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Peaque Dev Server</title>
-    <link rel="stylesheet" href="/peaque.css">
-  </head>
-  <body>
-    <div id="peaque"></div>
-    <script type="module" src="/hmr_client.js"></script>
-    <script type="module" src="/peaque.js"></script>
-  </body>
-  </html>
-  `
-
-  const router = new Router()
-  await addAssetRoutesForFolder(router, devAssets, "/")
-  router.addRoute("GET", "/", async (req) => {
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Peaque Dev Server</title>
+  <link rel="stylesheet" href="/peaque.css">
+</head>
+<body>
+  <div id="peaque"></div>
+  <script type="module" src="/peaque-dev.js"></script>
+  <script type="module" src="/peaque.js"></script>
+</body>
+</html>`
+  const indexRoute: RequestHandler = async (req) => {
     req.type("text/html").send(indexHtml)
-  })
-  router.addRoute("GET", "/hmr", async (req) => {
-    // This is a WebSocket upgrade request for HMR
-    if (req.isUpgradeRequest()) {
-      const ws = await req.upgradeToWebSocket({
-        onMessage: (message, ws) => {
-        },
-        onClose: (code, reason, ws) => {
-        },
-        onError: (error, ws) => {
-        },
-      });
-      connectedClients.add(ws);
+  }
+
+  // Track whether this is the first build to use build() vs rebuild()
+  let isFirstBuild = true
+
+  // Track rebuild state
+  let isRebuilding = false
+  let needsAnotherRun = false
+
+  async function rebuildEverything() {
+    config({ path: path.join(basePath, ".env"), override: true }) // re-load .env variables on each rebuild
+    config({ path: path.join(basePath, ".env.local"), override: true }) // re-load .env variables on each rebuild
+
+    // If already rebuilding, mark that another run is needed
+    if (isRebuilding) {
+      needsAnotherRun = true
+      return
     }
-  })
-  currentHandler = router.getRequestHandler()
-  
-  // Notify all connected clients about the update
-  connectedClients.forEach((ws) => {
-    if (ws.isOpen()) {
-      ws.send(JSON.stringify({ type: "reload", data: {} }))
-    } else {
-      connectedClients.delete(ws)
+
+    isRebuilding = true
+    needsAnotherRun = false
+
+    try {
+      const startTime = Date.now()
+
+      const pageRouter = await buildPageRouter(basePath)
+      const mainFile = await generatePageRouterJS(pageRouter, true, "./src")
+
+      // save mainFile for inspection
+      //const mainFileView = await generatePageRouterJS(pageRouter, true, "../src")
+      //fs.writeFileSync(path.join(basePath, ".peaque/_generated_main.tsx"), mainFileView, "utf-8")
+
+      // Update bundler with new content and build/rebuild
+      bundler.updateOptions({
+        entryContent: mainFile,
+        baseDir: basePath,
+      })
+
+      let jsBundleResult
+      if (isFirstBuild) {
+        console.log("🏗️  Performing initial build...")
+        jsBundleResult = await bundler.build()
+        isFirstBuild = false
+      } else {
+        console.log("🔄 Performing incremental rebuild...")
+        jsBundleResult = await bundler.rebuild()
+      }
+
+      if (!jsBundleResult.success) {
+        console.error("❌ Build failed:", jsBundleResult.errors)
+        return
+      }
+
+      const newJsContent = jsBundleResult.bundleContent!
+
+      // Create the css bundle
+      const stylePath = path.join(basePath, "src/styles.css")
+      const cssContent = fs.readFileSync(stylePath, "utf-8")
+      const newCssContent = await bundleCssFile(cssContent, basePath)
+
+      // Only write files and notify if content has changed
+      fs.writeFileSync(path.join(devAssets, "peaque.js"), newJsContent, "utf-8")
+      fs.writeFileSync(path.join(devAssets, "peaque.css"), newCssContent, "utf-8")
+
+      const router = new Router()
+      await addAssetRoutesForFolder(router, devAssets, "/")
+      await addAssetRoutesForFolder(router, basePath + "/src/public", "/")
+
+      pageRouter.routes.forEach((route) => {
+        router.addRoute("GET", route.path, indexRoute)
+      })
+      router.addRoute("GET", "/peaque-dev.js", peaqueDevJsRoute)
+      router.addRoute("GET", "/hmr", hmrConnectHandler)
+
+      const backend = await generateBackendProgram({
+        baseDir: basePath,
+        importPrefix: "../src/",
+      })
+      backend.routes.forEach((route) => {
+        let apiRoute: Record<HttpMethod, RequestHandler> | null = null
+        let middlewares: Array<RequestMiddleware> = []
+
+        route.methods.forEach((method) => {
+          const middleware = route.middleware
+          router.addRoute(method, route.path, async (req) => {
+            if (apiRoute === null) {
+              apiRoute = await importWithTsPaths("file:/" + path.join(basePath, route.filePath.replace(/\\/g, "/")) + "?t=" + Date.now(), {
+                absWorkingDir: basePath,
+              })
+
+              // load all the middlewares
+              middlewares = []
+              for (const mwPath of middleware) {
+                const mw = await importWithTsPaths("file:/" + path.join(basePath, mwPath.replace(/\\/g, "/")) + "?t=" + Date.now(), {
+                  absWorkingDir: basePath,
+                })
+                middlewares.push(mw.middleware)
+              }
+            }
+            req.type("application/json")
+            await executeMiddlewareChain(req, middlewares, apiRoute![method])
+          })
+        })
+      })
+
+      currentHandler = router.getRequestHandler()
+
+      notifyConnectedClients()
+      const endTime = Date.now()
+      console.log(`✅ Application refresh completed in ${endTime - startTime}ms`)
+    } finally {
+      isRebuilding = false
+
+      // If another rebuild was requested while this one was running, start it now
+      if (needsAnotherRun) {
+        console.log("🔄 Another rebuild was requested, starting it now...")
+        setImmediate(() => rebuildEverything())
+      }
     }
+  }
+
+  await rebuildEverything()
+
+  const watcher = chokidar.watch(basePath, {
+    cwd: basePath,
+    ignored: ["dist/**", "build/**", "node_modules/**", ".peaque/**", ".git/**", ".*/**"],
+    ignoreInitial: true,
   })
-  const endTime = Date.now()
-  console.log(`✅ Rebuild complete in ${endTime - startTime}ms`)
+
+  watcher.on("all", (event, path) => {
+    //console.log("🔄 Rebuild triggered (because of changes in src/)", path)
+    rebuildEverything()
+  })
+
+  const server = new HttpServer(outermostHandler)
+  await server.startServer(3000)
+
+  // Cleanup function to dispose of resources
+  async function cleanup() {
+    server.stop()
+    console.log("🧹 Cleaning up resources...")
+    await bundler.dispose()
+    process.exit(0)
+  }
+
+  // Handle process termination signals
+  process.on("SIGINT", cleanup)
+  process.on("SIGTERM", cleanup)
+  process.on("SIGUSR2", cleanup) // For nodemon restarts
 }
-
-await rebuildEverything()
-
-const watcher = chokidar.watch(basePath, {
-  cwd: basePath,
-  ignored: ["dist/**", "build/**", "node_modules/**", ".peaque/**", ".git/**", ".*/**"],
-  ignoreInitial: true,
-})
-
-let rebuildTimer: NodeJS.Timeout
-
-watcher.on("all", (event, path) => {
-  clearTimeout(rebuildTimer)
-  rebuildTimer = setTimeout(async () => {
-    console.log("🔄 Rebuild triggered (because of changes in src/)", path)
-    await rebuildEverything()
-  }, 300) // debounce delay
-})
-
-const server = new HttpServer(outermostHandler)
-await server.startServer(3000)

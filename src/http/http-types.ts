@@ -1,6 +1,4 @@
-// Framework types that represent a HTTP request and reply
-
-export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'OPTIONS' | 'HEAD'
+export type HttpMethod = "GET" | "POST" | "PUT" | "DELETE" | "PATCH" | "OPTIONS" | "HEAD"
 
 export interface RequestHandler {
   (req: PeaqueRequest): Promise<void> | void
@@ -11,9 +9,9 @@ export interface RequestMiddleware {
 }
 
 export interface PeaqueRequest {
-  body<T=any>(): T
+  body<T = any>(): T
   isResponded(): boolean
-  path():string
+  path(): string
   setPath(path: string): void
   param(name: string): string | undefined // first value of path params and query params
   paramNames(): string[] // all parameter names from path and query params
@@ -32,15 +30,16 @@ export interface PeaqueRequest {
   code(statusCode: number): PeaqueRequest
   header(name: string, value: string): PeaqueRequest
   type(contentType: string): PeaqueRequest
-  send<T=any>(data?: T): void
+  send<T = any>(data?: T): void
   redirect(url: string, code?: number): void
-  
-  // WebSocket upgrade support
+
+  responseCode(): number
+  responseBody(): any
+
   isUpgradeRequest(): boolean
   upgradeToWebSocket(handler: WebSocketHandler): PeaqueWebSocket
 }
 
-// Cookie jar interface for managing cookies
 export interface CookieOptions {
   maxAge?: number
   expires?: Date
@@ -48,7 +47,7 @@ export interface CookieOptions {
   domain?: string
   secure?: boolean
   httpOnly?: boolean
-  sameSite?: 'strict' | 'lax' | 'none'
+  sameSite?: "strict" | "lax" | "none"
 }
 
 export interface CookieJar {
@@ -58,8 +57,6 @@ export interface CookieJar {
   remove(name: string, options?: CookieOptions): void
 }
 
-
-// HTTP routing types
 export type MatchingRoute = {
   method: HttpMethod
   path: string
@@ -68,7 +65,6 @@ export type MatchingRoute = {
   middleware: RequestMiddleware[]
 }
 
-// WebSocket types
 export interface PeaqueWebSocket {
   send(data: string | Buffer): void
   close(code?: number, reason?: string): void
@@ -89,62 +85,4 @@ export type WebSocketHandler = {
   onMessage?: (message: string | Buffer, ws: PeaqueWebSocket) => void
   onClose?: (code: number, reason: string, ws: PeaqueWebSocket) => void
   onError?: (error: string, ws: PeaqueWebSocket) => void
-}
-
-// Head management types for custom meta tags, icons, and head elements
-
-export interface MetaTag {
-  name?: string
-  property?: string
-  httpEquiv?: string
-  content: string
-  charset?: string
-}
-
-export interface LinkTag {
-  rel: string
-  href: string
-  type?: string
-  sizes?: string
-  media?: string
-  crossOrigin?: string
-  integrity?: string
-  as?: 'document' | 'font' | 'image' | 'script' | 'style' | 'video' | 'audio' | 'fetch' | 'worker' | 'embed' | 'object' | 'track'
-}
-
-export interface ScriptTag {
-  src?: string
-  type?: string
-  async?: boolean
-  defer?: boolean
-  crossOrigin?: string
-  integrity?: string
-  innerHTML?: string
-}
-
-export interface IconConfig {
-  rel: 'icon' | 'apple-touch-icon' | 'shortcut icon' | 'mask-icon'
-  href: string
-  sizes?: string
-  type?: string
-  color?: string
-}
-
-export interface HeadConfig {
-  title?: string
-  description?: string
-  keywords?: string
-  author?: string
-  viewport?: string
-  charset?: string
-  icons?: IconConfig[]
-  meta?: MetaTag[]
-  links?: LinkTag[]
-  scripts?: ScriptTag[]
-}
-
-export interface ResolvedHeadConfig extends HeadConfig {
-  // Additional properties added during resolution
-  _filePath?: string
-  _priority?: number
 }

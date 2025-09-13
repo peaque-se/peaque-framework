@@ -1,6 +1,6 @@
 import http from "http"
 import { WebSocket, WebSocketServer } from "ws"
-import { PeaqueRequestImpl } from "../api-router"
+import { CookieJarImpl, PeaqueRequestImpl } from "./default-impl"
 import { parseRequestBody } from "./http-bodyparser"
 import { HttpMethod, PeaqueWebSocket, RequestHandler, WebSocketHandler } from "./http-types"
 
@@ -85,6 +85,7 @@ class PeaqueRequestImplWithWebSocket extends PeaqueRequestImpl {
 
 export class HttpServer {
   private handler: RequestHandler
+  private server = null as http.Server | null
   private wss?: WebSocketServer
 
   constructor(handler: RequestHandler) {
@@ -129,7 +130,7 @@ export class HttpServer {
   }
 
   startServer(port: number): void {
-    const server = http.createServer(async (req: http.IncomingMessage, res: http.ServerResponse) => {
+    this.server = http.createServer(async (req: http.IncomingMessage, res: http.ServerResponse) => {
       const url = req.url || "/"
       const requestPath = url.split("?")[0]
       // Parse query parameters from URL
@@ -174,7 +175,12 @@ export class HttpServer {
         this // pass the server instance for WebSocket management
       )
 
-      await this.handler(peaqueReq)
+      try {
+        await this.handler(peaqueReq)
+      } catch (err) {
+        console.error("Error in request handler:", err)
+        peaqueReq.code(500).type("text/plain").send("500 - Internal Server Error")
+      }
 
       if (!peaqueReq.isResponded()) {
         // No route matched and no response sent - return 404 by default
@@ -191,6 +197,12 @@ export class HttpServer {
             res.setHeader(key, value)
           }
         }
+        // take any cookies set in the response
+        const cookies = peaqueReq.cookies() as CookieJarImpl
+        for (const cookieStr of cookies.getSetCookieHeaders()) {
+          res.setHeader("Set-Cookie", cookieStr)
+        }
+
         if (peaqueReq.sendData !== undefined) {
           // handle different types of sendData (plain text, JSON, Buffer)
           if (typeof peaqueReq.sendData === "string") {
@@ -210,14 +222,12 @@ export class HttpServer {
     // Set up WebSocket server for upgrade handling
     this.wss = new WebSocketServer({ noServer: true })
 
-    server.listen(port)
-    console.log(`🚀 HTTP server started on port ${port}`)
+    this.server.listen(port)
+  }
+
+  stop() {
+    this.wss?.close()
+    this.server?.close()
   }
 }
 
-/// http server todo
-/// - [x] parse body data into parameters when content-type is application/x-www-form-urlencoded
-/// - [x] parse body data into json when content-type is application/json
-/// - [ ] support multipart/form-data for file uploads, adding file(name:string): FileUpload to PeaqueRequest
-/// - [ ] support fallbacks for 404 and 500 errors with custom handlers
-/// - [x] add a handler for static files that is efficient

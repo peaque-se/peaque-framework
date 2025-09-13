@@ -1,20 +1,23 @@
 import { createContext, useContext, useEffect, useState, Component, useCallback } from "react"
 import type { ReactElement, ReactNode } from "react"
+import type { HeadDefinition } from "./head.js"
 
 export type GuardResult = boolean | string | Promise<boolean | string>
 export type Guard = () => GuardResult
 
 export type Route = {
   path?: string
-  component?: React.ComponentType<any>
+  param?: string
+  page?: React.ComponentType<any>
   layout?: React.ComponentType<any>
   children?: Route[]
-  guard?: Guard | Guard[]
+  guard?: Guard
+  head?: HeadDefinition
   prefixLinks?: boolean
 }
 
 export type RouterProps = {
-  routes: Route[]
+  root: Route
   fallback?: ReactNode
 }
 
@@ -110,35 +113,64 @@ type MatchResult = {
   layouts: React.ComponentType<any>[]
   params: Record<string, string>
   guards: Guard[]
+  heads: HeadDefinition[]
 }
 
-function findMatch(routes: Route[], path: string, linkPrefix = "", parentPath = "", layoutStack: React.ComponentType[] = [], guardStack: Guard[] = []): MatchResult | null {
-  for (const route of routes) {
-    const fullPath = route.path ? [parentPath, route.path].filter(Boolean).join("/").replace(/\/+/g, "/") : parentPath
+function findMatch(root: Route, path: string): MatchResult | null {
+  const layoutStack: React.ComponentType<any>[] = [...root.layout ? [root.layout] : []]
+  const guardStack: Guard[] = [...root.guard ? [root.guard] : []]
+  const headStack: HeadDefinition[] = [...root.head ? [root.head] : []]
+  const pattern = []
 
-    const params = matchPath(fullPath, path)
+  // divide the path into segments and traverse the route tree, one segment at a time until we find a match or exhaust the tree
+  // nodes in the tree can have a path (static segment) or param (dynamic segment)
+  // at each segment, we look for a matching child route (static first, then dynamic)
+  // if we find a match, we push its layout and guard onto the stack (if any) and continue to the next segment
+  // if we don't find a match, we stop and return null
+  // if we exhaust all segments and are at a route with a component, we have a match
+  const segments = path === "/" ? [] : path.split("/")
+  let currentRoutes: Route[] = [root]
+  let params: Record<string, string> = {}
 
-    const newLinkPrefix = route.prefixLinks ? fullPath : linkPrefix
-    const newGuardStack = [...guardStack, ...(route.guard ? (Array.isArray(route.guard) ? route.guard : [route.guard]) : [])]
-
-    if (params && route.component) {
-      return {
-        component: route.component,
-        linkPrefix: newLinkPrefix,
-        pattern: fullPath,
-        layouts: layoutStack,
-        params,
-        guards: newGuardStack,
+  let matchedRoute: Route | null = root
+  for (const segment of segments) {
+    for (const route of currentRoutes) {
+      matchedRoute = null
+      if (route.param) {
+        params[route.param] = segment
+        pattern.push(`:${route.param}`)
+      } else if (route.path === segment || (!route.path && segment === "")) {
+        pattern.push(route.path)
+      } else {
+        continue
       }
+      if (route.layout) layoutStack.push(route.layout)
+      if (route.guard) guardStack.push(route.guard)
+      if (route.head) headStack.push(route.head)
+      matchedRoute = route
+      break
     }
-
-    if (route.children) {
-      const newLayoutStack = route.layout ? [...layoutStack, route.layout] : layoutStack
-      const match = findMatch(route.children, path, newLinkPrefix, fullPath, newLayoutStack, newGuardStack)
-      if (match) return match
+    if (matchedRoute) {
+      currentRoutes = matchedRoute.children || []
+      pattern.push(matchedRoute.path || "")
+    } else {
+      return null
     }
   }
-
+  // After processing all segments, check if we have a matching route with a component
+  if (matchedRoute) {
+    if (matchedRoute.page) {
+      return {
+        component: matchedRoute.page,
+        pattern: pattern.join("/"),
+        linkPrefix: "",
+        layouts: layoutStack,
+        params,
+        guards: guardStack,
+        heads: headStack
+      }
+    }
+  }
   return null
 }
 
@@ -251,7 +283,7 @@ export function NavLink({ to, className, children, ...rest }: NavLinkProps) {
   )
 }
 
-export function Router({ routes, fallback = <div>Loading...</div> }: RouterProps): ReactElement {
+export function Router({ root, fallback = <div>Loading...</div> }: RouterProps): ReactElement {
   const [path, setPath] = useState(() => window.location.pathname)
   const [guardState, setGuardState] = useState<{
     status: "pending" | "allowed" | "redirect" | "denied" | "404"
@@ -266,7 +298,7 @@ export function Router({ routes, fallback = <div>Loading...</div> }: RouterProps
   }, [])
 
   useEffect(() => {
-    const match = findMatch(routes, path)
+    const match = findMatch(root, path)
     if (!match) {
       setGuardState({ status: "404" })
       return
@@ -296,7 +328,7 @@ export function Router({ routes, fallback = <div>Loading...</div> }: RouterProps
 
     setGuardState({ status: "pending" })
     runGuards()
-  }, [path, routes])
+  }, [path, root])
 
   if (guardState.status === "404") return <div>404 Not Found</div>
   if (guardState.status === "pending") return <>{fallback}</>
@@ -305,7 +337,8 @@ export function Router({ routes, fallback = <div>Loading...</div> }: RouterProps
 
   if (!guardState.match) return <div>404 Not Found</div>
 
-  const { component: Component, layouts, params, pattern, linkPrefix } = guardState.match
+  const { component: Component, layouts, params, pattern, linkPrefix, heads } = guardState.match
+  document.title = heads.find(h => h.title)?.title || "Peaque App"
   const content = layouts.reduceRight(
     (child, Layout) => <Layout>{child}</Layout>,
     <ErrorBoundary fallback={<ErrorPanel/>} resetKeys={[path]}>
