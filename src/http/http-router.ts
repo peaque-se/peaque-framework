@@ -1,5 +1,5 @@
-import { MatchingRoute, RequestHandler, RequestMiddleware, PeaqueRequest } from "./http-types"
-import { HttpMethod } from "./http-types"
+import { MatchingRoute, RequestHandler, RequestMiddleware, PeaqueRequest } from "./http-types.js"
+import { HttpMethod } from "./http-types.js"
 
 class RouteNode {
   children: Map<string, RouteNode> = new Map()
@@ -109,6 +109,9 @@ export async function executeMiddlewareChain(req: PeaqueRequest, middleware: Req
   const next = async (): Promise<void> => {
     if (index < middleware.length) {
       const currentMiddleware = middleware[index]
+      if (!currentMiddleware) {
+        return next()
+      }
       index++
       await currentMiddleware(req, next)
     } else {

@@ -1,4 +1,4 @@
-import { PeaqueWebSocket, RequestHandler } from "../http/http-types"
+import { PeaqueWebSocket, RequestHandler } from "../http/http-types.js"
 
 const connectedClients = new Set<PeaqueWebSocket>()
 

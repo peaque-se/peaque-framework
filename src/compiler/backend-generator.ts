@@ -9,7 +9,7 @@
 import * as fs from 'fs';
 import { glob } from 'glob';
 import * as path from 'path';
-import { HttpMethod } from '../http/http-types';
+import { HttpMethod } from '../http/http-types.js';
 
 /**
  * Directory structure for organizing routes and middleware

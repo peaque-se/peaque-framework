@@ -1,2 +1,2 @@
-export { Router } from './http-router';
-export { HttpServer } from './http-server';
+export { Router } from './http-router.js';
+export { HttpServer } from './http-server.js';
