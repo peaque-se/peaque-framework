@@ -15,13 +15,19 @@ function showHelp() {
   console.log("  start   Start the production server")
   console.log("")
   console.log("Options:")
+  console.log("  -p, --path      Specify the project base path (default: current directory)")
   console.log("  -v, --verbose   Enable verbose logging")
   console.log("  -h, --help      Show this help message")
 }
 
 async function main() {
+  let basePath = process.cwd()
+  const basePathIndex = args.findIndex(arg => arg === "--path" || arg === "-p")
+  if (basePathIndex !== -1 && args.length > basePathIndex + 1) {
+    basePath = args[basePathIndex + 1]
+  }
   if (command === "dev") {
-    await runDevelopmentServer()
+    await runDevelopmentServer(basePath)
   } else if (command === "build") {
     console.log("Build command is not yet implemented.")
     process.exit(1)

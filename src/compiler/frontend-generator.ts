@@ -10,7 +10,7 @@ import * as fs from "fs"
 import { glob } from "glob"
 import * as path from "path"
 
-interface FlatRoute {
+export interface FlatRoute {
   path: string
   page: ComponentImport
   guardStack: ComponentImport[]
@@ -18,13 +18,13 @@ interface FlatRoute {
   headStack: ComponentImport[]
 }
 
-interface ComponentImport {
+export interface ComponentImport {
   componentName: string
   relativePath: string
   routePath: string
 }
 
-interface RouterNode {
+export interface RouterNode {
   pathPart: string
   page?: ComponentImport
   layout?: ComponentImport
@@ -33,7 +33,7 @@ interface RouterNode {
   children?: RouterNode[]
 }
 
-interface PageRouter {
+export interface PageRouter {
   root: RouterNode
   routes: FlatRoute[]
 }

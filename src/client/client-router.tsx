@@ -199,6 +199,10 @@ export function Link({ to, children, className, ...rest }: LinkProps) {
   }
 
   const onClick = (e: React.MouseEvent) => {
+    // Allow default browser behavior for middle-click, ctrl+click, shift+click, etc.
+    if (e.button !== 0 || e.ctrlKey || e.shiftKey || e.altKey || e.metaKey) {
+      return
+    }
     e.preventDefault()
     navigate(href)
   }
@@ -338,7 +342,7 @@ export function Router({ root, fallback = <div>Loading...</div> }: RouterProps):
   if (!guardState.match) return <div>404 Not Found</div>
 
   const { component: Component, layouts, params, pattern, linkPrefix, heads } = guardState.match
-  document.title = heads.find(h => h.title)?.title || "Peaque App"
+  document.title = heads.filter(h => h.title).at(-1)?.title || "Peaque App"
   const content = layouts.reduceRight(
     (child, Layout) => <Layout>{child}</Layout>,
     <ErrorBoundary fallback={<ErrorPanel/>} resetKeys={[path]}>

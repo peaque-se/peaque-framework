@@ -2,52 +2,52 @@
 
 > The last JavaScript framework ever to be needed
 
-Peaque is a modern, full-stack TypeScript web framework that combines the simplicity of file-based routing with the power of React, built-in styling with Tailwind CSS, and seamless development experience with Hot Module Replacement (HMR).
+Peaque is a modern, full-stack TypeScript web framework that combines file-based routing with React, built-in Tailwind CSS, and advanced Hot Module Replacement (HMR). Built from the ground up for developer productivity with zero configuration.
 
 ## ✨ Features
 
 ### 🚀 **Zero Configuration**
 - Get started instantly with no setup required
-- Automatic Tailwind CSS configuration
-- Built-in TypeScript support
-- Smart project structure detection
+- Automatic Tailwind CSS 4 configuration with PostCSS
+- Built-in TypeScript support with path resolution
+- Smart `src/` based project structure detection
 - Environment variable loading with `.env` support
 
 ### 📁 **File-Based Routing**
-- **Pages**: Create routes by adding `page.tsx` files in folders
-- **API Routes**: Build APIs with `route.ts` files using HTTP method exports
-- **Layouts**: Wrap pages with `layout.tsx` files for shared UI
-- **Route Guards**: Protect routes with `guard.ts` files for authentication/authorization
+- **Pages**: Create routes with `src/pages/**/page.tsx` files
+- **API Routes**: Build APIs with `src/api/**/route.ts` files using HTTP method exports
+- **Layouts**: Wrap pages with `src/pages/**/layout.tsx` files for shared UI
+- **Route Guards**: Protect routes with `src/pages/**/guard.ts` files
 - **Dynamic Routes**: Use `[param]` folders for parameterized routes
+- **WebSocket Support**: Full WebSocket integration with upgrade handling
 
-### ⚡ **Development Experience**
-- **Hot Module Replacement (HMR)**: Instant updates without page refresh
-- **Fast Builds**: Powered by esbuild for lightning-fast compilation
-- **Live Reloading**: Automatic page updates on file changes
-- **Error Handling**: Clear error messages and stack traces
-- **Verbose Logging**: Enhanced CLI output for debugging
+### ⚡ **Advanced Development Experience**
+- **Sophisticated HMR**: WebSocket-based hot reloading with incremental rebuilds
+- **Fast Builds**: Powered by esbuild with smart caching and path resolution
+- **File Watching**: Intelligent file monitoring with chokidar
+- **Live Asset Updates**: Real-time CSS and JavaScript recompilation
+- **Advanced Routing**: Client-side SPA router with React integration
 
 ### 🎨 **Built-in Styling**
-- **Tailwind CSS**: Utility-first CSS framework included by default
-- **Auto-purging**: Unused styles automatically removed in production
+- **Tailwind CSS 4**: Latest utility-first CSS framework
+- **Auto-processing**: PostCSS pipeline with autoprefixer
+- **Development Optimization**: Fast CSS rebuilds during development
 - **Custom Configurations**: Override with your own `tailwind.config.js`
-- **PostCSS**: Built-in processing with autoprefixer
 
 ### 🔒 **Route Protection**
 - **Guard Functions**: Implement authentication and authorization logic
 - **Nested Guards**: Hierarchical protection with layout inheritance
-- **Flexible Logic**: Custom guard functions with full TypeScript support
+- **TypeScript Integration**: Full type safety for guard functions
 
-### 🍪 **Cookie Management**
-- **Built-in Cookie Handlers**: GET and POST methods for cookie operations
-- **Secure Cookie Support**: HTTP-only and secure cookie options
+### 🍪 **Advanced Cookie Management**
+- **CookieJar API**: Comprehensive cookie handling with full options support
+- **Secure Defaults**: HTTP-only and secure cookie options
 - **TypeScript Integration**: Full type safety for cookie operations
 
-### 🏗️ **Production Ready**
-- **Optimized Builds**: Minified and tree-shaken production bundles
-- **Static Generation**: Pre-built assets for fast loading
-- **SEO Friendly**: Server-side rendering support
-- **Type Safety**: Full TypeScript integration throughout
+### 🌐 **WebSocket Support**
+- **Native WebSocket Integration**: Built-in WebSocket server capabilities
+- **Request Upgrades**: Seamless HTTP to WebSocket upgrades
+- **Type-Safe Handlers**: TypeScript interfaces for WebSocket events
 
 ## 🚀 Quick Start
 
@@ -57,72 +57,77 @@ Peaque is a modern, full-stack TypeScript web framework that combines the simpli
 npm install @peaque/framework@latest
 ```
 
-**Current Version**: 1.1.0
-
 ### Project Structure
 
 ```
 my-app/
-├── pages/
-│   ├── page.tsx              # Home page (/)
-│   ├── about/
-│   │   └── page.tsx          # About page (/about)
-│   ├── blog/
-│   │   ├── layout.tsx        # Blog layout
-│   │   ├── page.tsx          # Blog index (/blog)
-│   │   └── [slug]/
-│   │       └── page.tsx      # Blog post (/blog/:slug)
-│   └── dashboard/
-│       ├── guard.ts          # Protect dashboard routes
-│       ├── layout.tsx        # Dashboard layout
-│       └── page.tsx          # Dashboard (/dashboard)
-├── api/
-│   ├── users/
-│   │   └── route.ts          # API: /api/users
-│   └── posts/
-│       ├── route.ts          # API: /api/posts
-│       └── [id]/
-│           └── route.ts      # API: /api/posts/:id
-├── public/
-│   └── favicon.ico           # Static assets
-├── styles.css                # Global styles
+├── src/
+│   ├── pages/
+│   │   ├── page.tsx              # Home page (/)
+│   │   ├── about/
+│   │   │   └── page.tsx          # About page (/about)
+│   │   ├── blog/
+│   │   │   ├── layout.tsx        # Blog layout
+│   │   │   ├── page.tsx          # Blog index (/blog)
+│   │   │   └── [slug]/
+│   │   │       └── page.tsx      # Blog post (/blog/:slug)
+│   │   └── dashboard/
+│   │       ├── guard.ts          # Protect dashboard routes
+│   │       ├── layout.tsx        # Dashboard layout
+│   │       └── page.tsx          # Dashboard (/dashboard)
+│   ├── api/
+│   │   ├── users/
+│   │   │   └── route.ts          # API: /api/users
+│   │   └── posts/
+│   │       ├── route.ts          # API: /api/posts
+│   │       └── [id]/
+│   │           └── route.ts      # API: /api/posts/:id
+│   ├── public/
+│   │   └── favicon.ico           # Static assets
+│   └── styles.css                # Global styles
+├── .env                          # Environment variables
 └── package.json
 ```
 
-### Commands
+### Available Commands
 
 ```bash
-# Development server with HMR
+# Development server with advanced HMR
 peaque dev
 
-# Production build
-peaque build
+# Production build (Coming Soon)
+# peaque build
 
-# Production server
-peaque start
+# Production server (Coming Soon)
+# peaque start
 ```
+
+**Note**: Currently only the `dev` command is implemented. Production build and start commands are planned for future releases.
 
 ## 📖 Documentation
 
 ### Creating Pages
 
-Create a `page.tsx` file in any folder within `pages/`:
+Create a `page.tsx` file in any folder within `src/pages/`:
 
 ```typescript
-// pages/page.tsx - Home page
+// src/pages/page.tsx - Home page
 export default function HomePage() {
   return (
     <div className="p-8">
       <h1 className="text-4xl font-bold text-blue-600">
-        Welcome to Peaque!
+        Welcome to Peaque Framework v2!
       </h1>
+      <p className="mt-4 text-gray-600">
+        Built with advanced HMR and zero configuration.
+      </p>
     </div>
   );
 }
 ```
 
 ```typescript
-// pages/about/page.tsx - About page
+// src/pages/about/page.tsx - About page
 export default function AboutPage() {
   return (
     <div className="container mx-auto p-8">
@@ -138,12 +143,12 @@ export default function AboutPage() {
 Use square brackets for dynamic segments:
 
 ```typescript
-// pages/blog/[slug]/page.tsx
+// src/pages/blog/[slug]/page.tsx
 import { useParams } from '@peaque/framework';
 
 export default function BlogPostPage() {
   const { slug } = useParams();
-  
+
   return (
     <article className="prose max-w-4xl mx-auto p-8">
       <h1>Blog Post: {slug}</h1>
@@ -158,7 +163,7 @@ export default function BlogPostPage() {
 Create shared layouts with `layout.tsx`:
 
 ```typescript
-// pages/blog/layout.tsx
+// src/pages/blog/layout.tsx
 import { ReactNode } from 'react';
 
 interface BlogLayoutProps {
@@ -186,20 +191,19 @@ export default function BlogLayout({ children }: BlogLayoutProps) {
 Protect routes with authentication logic:
 
 ```typescript
-// pages/dashboard/guard.ts
+// src/pages/dashboard/guard.ts
 import { PeaqueRequest } from '@peaque/framework';
 
 export function GUARD(request: PeaqueRequest): boolean | Promise<boolean> {
   // Check authentication
-  const token = request.requestHeader('authorization');
-  
-  if (!token) {
-    // Redirect to login or show error
+  const authHeader = request.requestHeader('authorization');
+
+  if (!authHeader) {
     return false;
   }
-  
+
   // Verify token and return result
-  return verifyToken(token);
+  return verifyToken(authHeader);
 }
 
 async function verifyToken(token: string): Promise<boolean> {
@@ -213,7 +217,7 @@ async function verifyToken(token: string): Promise<boolean> {
 Create backend APIs with HTTP method exports:
 
 ```typescript
-// api/users/route.ts
+// src/api/users/route.ts
 import { PeaqueRequest } from '@peaque/framework';
 
 export async function GET(request: PeaqueRequest) {
@@ -228,7 +232,12 @@ export async function POST(request: PeaqueRequest) {
 }
 
 export async function DELETE(request: PeaqueRequest) {
-  const { id } = request.param('id');
+  const id = request.queryParam('id');
+  if (!id) {
+    request.code(400).send({ error: 'Missing id parameter' });
+    return;
+  }
+
   await deleteUser(id);
   request.code(204).send();
 }
@@ -237,59 +246,108 @@ export async function DELETE(request: PeaqueRequest) {
 ### Dynamic API Routes
 
 ```typescript
-// api/posts/[id]/route.ts
+// src/api/posts/[id]/route.ts
 import { PeaqueRequest } from '@peaque/framework';
 
 export async function GET(request: PeaqueRequest) {
   const id = request.pathParam('id');
   const post = await getPostById(id);
-  
+
   if (!post) {
     request.code(404).send({ error: 'Post not found' });
     return;
   }
-  
+
   request.send({ post });
 }
 
 export async function PUT(request: PeaqueRequest) {
   const id = request.pathParam('id');
   const updateData = request.body();
-  
+
   const updatedPost = await updatePost(id, updateData);
   request.send({ post: updatedPost });
 }
 ```
 
-### Cookie Management
+### WebSocket Support
 
-Peaque provides built-in cookie management with GET and POST handlers:
+Upgrade HTTP requests to WebSocket connections:
 
 ```typescript
-// api/auth/cookies/route.ts
+// src/api/chat/route.ts
 import { PeaqueRequest } from '@peaque/framework';
 
 export async function GET(request: PeaqueRequest) {
+  if (request.isUpgradeRequest()) {
+    const ws = request.upgradeToWebSocket({
+      onMessage: (message, socket) => {
+        console.log('Received:', message);
+        socket.send(`Echo: ${message}`);
+      },
+      onClose: (code, reason, socket) => {
+        console.log('WebSocket closed:', code, reason);
+      },
+      onError: (error, socket) => {
+        console.error('WebSocket error:', error);
+      }
+    });
+
+    ws.send('Welcome to the chat!');
+  } else {
+    request.send({ message: 'WebSocket endpoint' });
+  }
+}
+```
+
+### Advanced Cookie Management
+
+Peaque provides a comprehensive CookieJar API:
+
+```typescript
+// src/api/auth/session/route.ts
+import { PeaqueRequest } from '@peaque/framework';
+
+export async function GET(request: PeaqueRequest) {
+  // Get specific cookie
+  const sessionId = request.cookies().get('sessionId');
+
   // Get all cookies
-  const cookies = request.cookies().getAll();
-  request.send({ cookies });
+  const allCookies = request.cookies().getAll();
+
+  request.send({ sessionId, allCookies });
 }
 
 export async function POST(request: PeaqueRequest) {
-  // Set a cookie
-  request.cookies().set('session', 'abc123', {
+  const { userId } = request.body();
+
+  // Set cookie with advanced options
+  request.cookies().set('sessionId', generateSessionId(userId), {
     httpOnly: true,
     secure: true,
-    maxAge: 86400 // 24 hours
+    sameSite: 'strict',
+    maxAge: 86400, // 24 hours
+    path: '/'
   });
-  
+
+  request.send({ success: true });
+}
+
+export async function DELETE(request: PeaqueRequest) {
+  // Remove cookie
+  request.cookies().remove('sessionId', {
+    path: '/',
+    secure: true,
+    httpOnly: true
+  });
+
   request.send({ success: true });
 }
 ```
 
 ## 🎨 Styling
 
-Peaque includes Tailwind CSS by default. Just start using utility classes:
+Peaque includes Tailwind CSS 4 by default with PostCSS processing:
 
 ```typescript
 export default function StyledPage() {
@@ -297,14 +355,21 @@ export default function StyledPage() {
     <div className="min-h-screen bg-gradient-to-r from-blue-500 to-purple-600">
       <div className="container mx-auto px-4 py-16">
         <h1 className="text-5xl font-bold text-white text-center mb-8">
-          Beautiful Design
+          Beautiful Design with Tailwind CSS 4
         </h1>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          <div className="bg-white rounded-lg shadow-lg p-6">
-            <h2 className="text-xl font-semibold mb-4">Feature One</h2>
-            <p className="text-gray-600">Description here...</p>
+          <div className="bg-white/10 backdrop-blur rounded-lg p-6">
+            <h2 className="text-xl font-semibold text-white mb-4">Feature One</h2>
+            <p className="text-blue-100">Advanced HMR with WebSocket support</p>
           </div>
-          {/* More cards... */}
+          <div className="bg-white/10 backdrop-blur rounded-lg p-6">
+            <h2 className="text-xl font-semibold text-white mb-4">Feature Two</h2>
+            <p className="text-blue-100">File-based routing with TypeScript</p>
+          </div>
+          <div className="bg-white/10 backdrop-blur rounded-lg p-6">
+            <h2 className="text-xl font-semibold text-white mb-4">Feature Three</h2>
+            <p className="text-blue-100">Zero configuration setup</p>
+          </div>
         </div>
       </div>
     </div>
@@ -314,46 +379,85 @@ export default function StyledPage() {
 
 ## 🔧 Configuration
 
-Peaque works out of the box, but you can customize it:
-
 ### Environment Variables
 
-Create a `.env` file in your project root for environment variables:
+Create a `.env` file in your project root:
 
 ```bash
 # .env
 PORT=3000
 HOST=localhost
 NODE_ENV=development
+
+# Client-side accessible variables (prefixed with PEAQUE_PUBLIC_)
 PEAQUE_PUBLIC_API_URL=https://api.example.com
+PEAQUE_PUBLIC_APP_NAME=My Peaque App
 ```
 
-Peaque automatically loads environment variables from `.env` files and makes `PEAQUE_PUBLIC_*` variables available on the client side.
+Variables prefixed with `PEAQUE_PUBLIC_` are automatically available on the client side.
 
+### Client-Side Router
+
+Use Peaque's built-in router hooks:
+
+```typescript
+import {
+  useParams,
+  useNavigate,
+  useCurrentPath,
+  useSearchParams,
+  Link,
+  NavLink
+} from '@peaque/framework';
+
+export default function NavigationExample() {
+  const params = useParams();
+  const navigate = useNavigate();
+  const currentPath = useCurrentPath();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  return (
+    <div>
+      <nav>
+        <Link to="/">Home</Link>
+        <NavLink to="/about" activeClassName="text-blue-600">
+          About
+        </NavLink>
+      </nav>
+
+      <p>Current path: {currentPath}</p>
+      <button onClick={() => navigate('/dashboard')}>
+        Go to Dashboard
+      </button>
+    </div>
+  );
+}
 ```
 
-## 🚀 Deployment
+## 🚧 Development Status
 
-### Build for Production
+**Current Version**: 2.0.5
 
-```bash
-peaque build
-```
+**Implemented Features**:
+- ✅ Advanced development server with HMR
+- ✅ File-based routing system
+- ✅ TypeScript compilation with esbuild
+- ✅ Tailwind CSS 4 processing
+- ✅ WebSocket support
+- ✅ Cookie management
+- ✅ Route guards and layouts
+- ✅ Static asset serving
 
-This generates optimized assets in `.peaque/dist/`:
-- `peaque.js` - Your application bundle
-- `peaque.css` - Processed and purged styles
-- `index.html` - HTML entry point
-
-### Start Production Server
-
-```bash
-peaque start
-```
+**Planned Features**:
+- 🚧 Production build system (`peaque build`)
+- 🚧 Production server (`peaque start`)
+- 🚧 Static site generation
+- 🚧 SEO optimizations
+- 🚧 Deployment guides
 
 ## 🤝 Contributing
 
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+We welcome contributions! This framework is actively developed and evolving rapidly.
 
 ## 📄 License
 
@@ -367,9 +471,10 @@ MIT © 2025 Peaque Framework
 
 ---
 
-**Recent Updates (v1.1.0)**:
-- ✨ Added dotenv support for environment variables
-- 🍪 Implemented built-in cookie management
-- 🔧 Enhanced CLI with verbose logging
-- 📦 Updated to React 19 and latest dependencies
-- 🛠️ Improved module resolution and TypeScript path support
+**Version 2.0.5 Features**:
+- 🆕 Complete v2 architecture with custom HTTP server
+- 🆕 Advanced WebSocket integration
+- 🆕 Sophisticated HMR system with incremental builds
+- 🆕 Enhanced CookieJar API with full options support
+- 🆕 Smart file watching with chokidar
+- 🆕 TypeScript path resolution and module handling

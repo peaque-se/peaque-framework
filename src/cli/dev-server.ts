@@ -5,17 +5,16 @@ import path from "path"
 import { addAssetRoutesForFolder } from "../assets/asset-handler.js"
 import { generateBackendProgram } from "../compiler/backend-generator.js"
 import { FrontendBundler } from "../compiler/frontend-bundler.js"
-import { buildPageRouter, generatePageRouterJS } from "../compiler/frontend-generator.js"
+import { buildPageRouter, FlatRoute, generatePageRouterJS } from "../compiler/frontend-generator.js"
 import { bundleCssFile } from "../compiler/tailwind-bundler.js"
 import { HttpServer, Router } from "../http/index.js"
 import { HttpMethod, RequestHandler, RequestMiddleware } from "../http/http-types.js"
-import { importWithTsPaths } from "../hmr/import-file.js"
+import { ModuleLoader } from "../hmr/module-loader.js"
 import { getHmrClientJs, hmrConnectHandler, notifyConnectedClients } from "../hmr/hmr-handler.js"
 import { executeMiddlewareChain } from "../http/http-router.js"
+import { HeadDefinition, mergeHead, renderHead } from "../client/head.js"
 
-export const runDevelopmentServer = async () => {
-  const basePath = process.cwd()
-
+export const runDevelopmentServer = async (basePath: string) => {
   // make sure there is a @peaque/framework dependency in package.json
   const pkgPath = path.join(basePath, "package.json")
   if (!fs.existsSync(pkgPath)) {
@@ -52,22 +51,46 @@ export const runDevelopmentServer = async () => {
     const devcontent = 'window.process = { env: { NODE_ENV: "development" } };' + "\n" + hmrClientContent + "\n"
     req.type("application/javascript").send(devcontent)
   }
-  const indexHtml = `<!DOCTYPE html>
+  const defaultHead: HeadDefinition = {
+    title: "Peaque Dev Server",
+    meta: [
+      { name: "viewport", content: "width=device-width, initial-scale=1" },
+      { name: "description", content: "A Peaque Framework Application" },
+    ],
+    link: [{ rel: "stylesheet", href: "/peaque.css" }],
+  }
+
+  function makeIndexRoute(route: FlatRoute): RequestHandler {
+    const headLoader = new ModuleLoader({ absWorkingDir: basePath })
+    let head : string | null = null
+
+    return async (req) => {
+      if (!head) {
+        let headDefinition = defaultHead
+        for (const headImport of route.headStack) {
+          try {
+            const headModule = await headLoader.loadModule(path.join("src/pages/", headImport.relativePath))
+            headDefinition = mergeHead(headDefinition, headModule.default)
+          } catch (err) {
+            console.warn(`⚠️  Failed to load head component at ${headImport.relativePath}:`, err)
+          }
+        }
+        head = renderHead(headDefinition)
+      }
+      const indexHtml = `<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Peaque Dev Server</title>
-  <link rel="stylesheet" href="/peaque.css">
+<meta charset="UTF-8">
+${head}
 </head>
 <body>
-  <div id="peaque"></div>
-  <script type="module" src="/peaque-dev.js"></script>
-  <script type="module" src="/peaque.js"></script>
+<div id="peaque"></div>
+<script type="module" src="/peaque-dev.js"></script>
+<script type="module" src="/peaque.js"></script>
 </body>
 </html>`
-  const indexRoute: RequestHandler = async (req) => {
-    req.type("text/html").send(indexHtml)
+      req.type("text/html").send(indexHtml)
+    }
   }
 
   // Track whether this is the first build to use build() vs rebuild()
@@ -137,7 +160,7 @@ export const runDevelopmentServer = async () => {
       await addAssetRoutesForFolder(router, basePath + "/src/public", "/")
 
       pageRouter.routes.forEach((route) => {
-        router.addRoute("GET", route.path, indexRoute)
+        router.addRoute("GET", route.path, makeIndexRoute(route))
       })
       router.addRoute("GET", "/peaque-dev.js", peaqueDevJsRoute)
       router.addRoute("GET", "/hmr", hmrConnectHandler)
@@ -146,25 +169,28 @@ export const runDevelopmentServer = async () => {
         baseDir: basePath,
         importPrefix: "../src/",
       })
+
+      // Create module loader for lazy loading with concurrency control
+      // Each new instance automatically ensures fresh modules are loaded
+      const moduleLoader = new ModuleLoader({
+        absWorkingDir: basePath,
+      })
+
       backend.routes.forEach((route) => {
         let apiRoute: Record<HttpMethod, RequestHandler> | null = null
         let middlewares: Array<RequestMiddleware> = []
 
         route.methods.forEach((method) => {
-          const middleware = route.middleware
           router.addRoute(method, route.path, async (req) => {
             if (apiRoute === null) {
-              apiRoute = await importWithTsPaths("file:/" + path.join(basePath, route.filePath.replace(/\\/g, "/")) + "?t=" + Date.now(), {
-                absWorkingDir: basePath,
-              })
+              // Load API route module with fresh import
+              apiRoute = await moduleLoader.loadModule(route.filePath)
 
-              // load all the middlewares
+              // Load middlewares lazily with proper concurrency control
               middlewares = []
-              for (const mwPath of middleware) {
-                const mw = await importWithTsPaths("file:/" + path.join(basePath, mwPath.replace(/\\/g, "/")) + "?t=" + Date.now(), {
-                  absWorkingDir: basePath,
-                })
-                middlewares.push(mw.middleware)
+              for (const mwPath of route.middleware) {
+                const middleware = await moduleLoader.loadExport<RequestMiddleware>(mwPath, 'middleware')
+                middlewares.push(middleware)
               }
             }
             req.type("application/json")

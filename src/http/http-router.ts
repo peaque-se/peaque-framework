@@ -105,13 +105,14 @@ export class Router {
 }
 
 export async function executeMiddlewareChain(req: PeaqueRequest, middleware: RequestMiddleware[], finalHandler: RequestHandler): Promise<void> {
+  // if any middleware is missing, throw an error
+  if (middleware.some(mw => typeof mw !== 'function')) {
+    throw new Error("⚠️  Error: One or more middleware functions are not valid.")
+  }
   let index = 0
   const next = async (): Promise<void> => {
     if (index < middleware.length) {
       const currentMiddleware = middleware[index]
-      if (!currentMiddleware) {
-        return next()
-      }
       index++
       await currentMiddleware(req, next)
     } else {

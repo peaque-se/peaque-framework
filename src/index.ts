@@ -10,7 +10,7 @@ export {
   useSearchParams,
   setSearchParam,
   navigate
-} from './client/router.js';
+} from './client/client-router.js';
 
 export type {
   Route,
@@ -19,7 +19,7 @@ export type {
   GuardResult,
   CurrentMatch,
   SearchParams
-} from './client/router.js';
+} from './client/client-router.js';
 
 export type {
   HeadDefinition
