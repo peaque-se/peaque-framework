@@ -127,7 +127,9 @@ async function generateHierarchicalRouterCode(
   routerCalls: string[];
   routes: Array<{ path: string; methods: HttpMethod[]; filePath: string; middleware: string[] }>;
 }> {
-  const imports: string[] = [`import { Router, HttpServer } from "@peaque/framework/server"`];
+  const imports: string[] = [
+    `import { Router, HttpServer, addAssetRoutesForFolder } from "@peaque/framework/server"`,
+  ];
   const routerCalls: string[] = [];
   const routes: Array<{ path: string; methods: HttpMethod[]; filePath: string; middleware: string[] }> = [];
 
@@ -158,7 +160,7 @@ async function generateRouterForDirectory(
   if (node.middleware) {
     const middlewareAlias = generateMiddlewareAlias(node.path);
     const importPath = importPrefix + node.middleware.replace(/\\/g, '/');
-    imports.push(`import { default as ${middlewareAlias} } from "${importPath}"`);
+    imports.push(`import { middleware as ${middlewareAlias} } from "${importPath}"`);
 
     const newRouterVar = `${routerVar}WithMiddleware${depth}`;
     routerCalls.push(`  const ${newRouterVar} = ${currentRouterVar}.use(${middlewareAlias})`);
@@ -225,6 +227,7 @@ interface GeneratedBackendProgram {
 export async function generateBackendProgram(options: {
   baseDir?: string // default to process.cwd()
   importPrefix?: string // default to "../src/"
+  additionalRouterCode?: string // additional code to insert into the generated file
 }): Promise<GeneratedBackendProgram> {
   const baseDir = options.baseDir || process.cwd()
   const importPrefix = options.importPrefix || "../src/"
@@ -258,20 +261,26 @@ export async function generateBackendProgram(options: {
   // Generate the complete output
   const routerFunction = [
     '',
-    'export function makeBackendRouter() {',
+    'export async function makeBackendRouter() {',
     '  const router = new Router()',
     ...routerCalls,
+    '  await addAssetRoutesForFolder(router, `${process.cwd()}/assets`, "/")',
+    options.additionalRouterCode || '',
     '  return router',
     '}'
   ].join('\n')
 
   const startupFunction = [
-    'const router = makeBackendRouter()',
-    'const server = new HttpServer(router)',
-    'server.startServer(3000)'
+    'async function main() {',
+    ' const router = await makeBackendRouter()',
+    ' const server = new HttpServer(router.getRequestHandler())',
+    ' server.startServer(3000)',
+    ' console.log("🚀  Server started on http://localhost:3000")',
+    '}',
+    'main()',
   ].join('\n')
 
-  const content = imports + routerFunction + '\n\n' + startupFunction
+  const content = imports.join('\n') + '\n\n' + routerFunction + '\n\n' + startupFunction
 
   return { content, routes }
 }

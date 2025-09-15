@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { runDevelopmentServer } from "./dev-server.js"
+import { buildForProduction } from "./prod-builder.js"
 
 const command = process.argv[2]
 const args = process.argv.slice(3)
@@ -29,7 +30,7 @@ async function main() {
   if (command === "dev") {
     await runDevelopmentServer(basePath)
   } else if (command === "build") {
-    console.log("Build command is not yet implemented.")
+    await buildForProduction(basePath)
     process.exit(1)
   } else if (command === "start") {
     console.log("Start command is not yet implemented.")

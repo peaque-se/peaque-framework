@@ -15,6 +15,10 @@ import { executeMiddlewareChain } from "../http/http-router.js"
 import { HeadDefinition, mergeHead, renderHead } from "../client/head.js"
 
 export const runDevelopmentServer = async (basePath: string) => {
+
+  console.log(`🚀 Starting Peaque development server on http://localhost:3000`)
+  console.log(`   Base path: ${basePath}`)
+
   // make sure there is a @peaque/framework dependency in package.json
   const pkgPath = path.join(basePath, "package.json")
   if (!fs.existsSync(pkgPath)) {
