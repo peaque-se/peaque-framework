@@ -11,6 +11,8 @@ import { HeadDefinition } from "../index.js"
 import { mergeHead, renderHead } from "../client/head.js"
 
 export const buildForProduction = async (basePath: string) => {
+  const startTime = Date.now()
+  console.log(`🚀  Starting @peaque/framework production build for ${basePath}`)
   const outDir = path.join(basePath, "dist")
   const assetDir = path.join(outDir, "assets")
   fs.mkdirSync(assetDir, { recursive: true })
@@ -124,6 +126,6 @@ require("./server_without_env.js")
   // remove server_without_env.js
   fs.unlinkSync(path.join(outDir, "server_without_env.js"))
 
-  console.log("✅ Production build completed successfully.")
-  console.log(`📁 Output directory: ${outDir}`)
+  const endTime = Date.now()
+  console.log("✅  Production build completed successfully in " + ((endTime - startTime) / 1000).toFixed(2) + " seconds")
 }

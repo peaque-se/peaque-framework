@@ -1,7 +1,10 @@
 #!/usr/bin/env node
 
+import { spawn } from "child_process"
 import { runDevelopmentServer } from "./dev-server.js"
 import { buildForProduction } from "./prod-builder.js"
+import path from "path"
+import fs from "fs"
 
 const command = process.argv[2]
 const args = process.argv.slice(3)
@@ -31,10 +34,26 @@ async function main() {
     await runDevelopmentServer(basePath)
   } else if (command === "build") {
     await buildForProduction(basePath)
-    process.exit(1)
+    process.exit(0)
   } else if (command === "start") {
-    console.log("Start command is not yet implemented.")
-    process.exit(1)
+    console.log(`🚀  Starting @peaque/framework production server for ${basePath}`)
+
+    // determine if main.js exists here or under dist/
+
+    const inDist = fs.existsSync(path.join(basePath, "dist", "main.js"))
+    const inSrc = fs.existsSync(path.join(basePath, "main.js"))
+    const cwd = inDist ? path.join(basePath, "dist") : basePath
+    if (!inDist && !inSrc) {
+      console.error(`No main.js found in ${basePath} or ${path.join(basePath, "dist")}. Please run "peaque build" first.`)
+      process.exit(1)
+    }
+
+    const child = spawn("node", ["./main.js"], { cwd })
+    child.stdout.pipe(process.stdout)
+    child.stderr.pipe(process.stderr)
+    child.on("close", (code) => {
+      process.exit(code)
+    })
   } else {
     console.error(`Unknown command: ${command}`)
     showHelp()
