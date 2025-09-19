@@ -33,11 +33,11 @@ export const hmrConnectHandler: RequestHandler = async (req) => {
   }
 }
 
-export function notifyConnectedClients() {
+export function notifyConnectedClients(data: any = {}) {
   if (connectedClients.size > 0) {
     connectedClients.forEach((ws) => {
       if (ws.isOpen()) {
-        ws.send(JSON.stringify({ type: "reload", data: {} }))
+        ws.send(JSON.stringify({ type: "reload", data }))
       } else {
         connectedClients.delete(ws)
       }

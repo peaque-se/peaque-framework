@@ -5,6 +5,7 @@ import { runDevelopmentServer } from "./dev-server.js"
 import { buildForProduction } from "./prod-builder.js"
 import path from "path"
 import fs from "fs"
+import { runFastRefreshServer } from "./fast-refresh-server.js"
 
 const command = process.argv[2]
 const args = process.argv.slice(3)
@@ -15,6 +16,7 @@ function showHelp() {
   console.log("")
   console.log("Commands:")
   console.log("  dev     Start development server")
+  console.log("  hmr     Start development server with HMR (experimental)")
   console.log("  build   Build the application for production")
   console.log("  start   Start the production server")
   console.log("")
@@ -32,6 +34,8 @@ async function main() {
   }
   if (command === "dev") {
     await runDevelopmentServer(basePath)
+  } else if (command === "hmr") {
+    await runFastRefreshServer(basePath)
   } else if (command === "build") {
     await buildForProduction(basePath)
     process.exit(0)
