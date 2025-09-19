@@ -1,13 +1,23 @@
+/// Bundles modules from node_modules, handling both CommonJS and ES modules
+/// Uses esbuild to create a single ES module output
+/// Handles dependencies by marking them as external to avoid bundling them
+/// Converts require calls to import statements for compatibility
+/// © Peaque Developers 2025
+
 import * as fs from "fs"
 import path from "path"
 import * as esbuild from "esbuild"
 import { createRequire } from "module"
 import { makeImportsRelative } from "./imports.js"
 
+/// Determines if a package.json indicates an ES module
+/// This is based on the presence of "module" field, the "type" field,
+/// and the extensions of the "main" field.
 function isESMModule(pkgJson: any): boolean {
-  if (pkgJson.name === "tailwind-merge") return true
   if (!pkgJson) return false
   if (pkgJson.module) return true
+  // if the export contains . and it has an import field, it's ESM
+  if (pkgJson.exports && typeof pkgJson.exports === "object" && pkgJson.exports["."] && pkgJson.exports["."].import) return true
   if (pkgJson.main && pkgJson.main.endsWith(".cjs")) return false
   if (pkgJson.main && pkgJson.main.endsWith(".mjs")) return true
 
@@ -16,40 +26,16 @@ function isESMModule(pkgJson: any): boolean {
 
 const dependencies: string[] = []
 
+/// Bundles a CommonJS module into an ES module using esbuild
+/// This is a bit tricky because we need to handle the exports correctly
+/// and also make sure that we don't bundle dependencies that are already
+/// available in the environment (like react, react-dom, etc.)
+/// The strategy is to create a small wrapper module that imports the CJS module
+/// using a dynamic import and then re-exports the named exports and the default export.
+/// Then we bundle this wrapper module using esbuild and mark the dependencies as external.
+/// Finally, we convert any remaining require calls to imports for react and scheduler (TODO: generalize this)
 async function bundleCommonJSModule(moduleName: string, pkgJson: any, basePath: string): Promise<string> {
   const moduleBaseName = moduleName.split("/")[0]
-  const moduleRequestPath = moduleName.includes("/") ? moduleName.split("/").slice(1).join("/") : ""
-
-  //console.log(`Bundling CommonJS module: ${moduleName}, base: ${dependencies}`)
-  // let entryPath = path.join(basePath, "node_modules", moduleBaseName, pkgJson.main || "index.js")
-  // // understand the package.json exports field if it exists
-  // if (pkgJson.exports) {
-  //   if (typeof pkgJson.exports === "string") {
-  //     // simple case, exports is a string
-  //     entryPath = path.join("node_modules", moduleBaseName, pkgJson.exports)
-  //   } else if (typeof pkgJson.exports === "object") {
-  //     // more complex case, exports is an object
-  //     if (pkgJson.exports[`./${moduleRequestPath}`]) {
-  //       if (typeof pkgJson.exports[`./${moduleRequestPath}`] === "string") {
-  //         entryPath = path.join("node_modules", moduleBaseName, pkgJson.exports[`./${moduleRequestPath}`])
-  //       } else if (typeof pkgJson.exports[`./${moduleRequestPath}`] === "object" && pkgJson.exports[`./${moduleRequestPath}`].import) {
-  //         entryPath = path.join("node_modules", moduleBaseName, pkgJson.exports[`./${moduleRequestPath}`].import)
-  //       } else if (typeof pkgJson.exports[`./${moduleRequestPath}`] === "object" && pkgJson.exports[`./${moduleRequestPath}`].default) {
-  //         entryPath = path.join("node_modules", moduleBaseName, pkgJson.exports[`./${moduleRequestPath}`].default)
-  //       }
-  //     } else if (pkgJson.exports["."]) {
-  //       if (typeof pkgJson.exports["."] === "string") {
-  //         entryPath = path.join("node_modules", moduleBaseName, pkgJson.exports["."])
-  //       } else if (typeof pkgJson.exports["."] === "object" && pkgJson.exports["."].import) {
-  //         entryPath = path.join("node_modules", moduleBaseName, pkgJson.exports["."].import)
-  //       } else if (typeof pkgJson.exports["."] === "object" && pkgJson.exports["."].default) {
-  //         entryPath = path.join("node_modules", moduleBaseName, pkgJson.exports["."].default)
-  //       }
-  //     }
-  //   }
-  // }
-  //console.log(`Bundling CommonJS module: ${moduleName}, entryPath: ${entryPath}`)
-
   const require = createRequire("file://" + path.join(basePath, "noop.js").replace(/\\/g, "/"))
   const mod = require(moduleName)
   const keys = Object.keys(mod)
@@ -59,11 +45,7 @@ async function bundleCommonJSModule(moduleName: string, pkgJson: any, basePath: 
   }
   code += `export default cjs;\n`
 
-
-  // for commonjs modules, we need to bundle them using esbuild
-  // find the main file from package.json
   const result = await esbuild.build({
-    //entryPoints: [entryPath],
     stdin: {
       contents: code,
       resolveDir: basePath,
@@ -76,48 +58,52 @@ async function bundleCommonJSModule(moduleName: string, pkgJson: any, basePath: 
     platform: "neutral",
     splitting: false,
     define: { "process.env.NODE_ENV": '"development"' },
-    external: dependencies.filter(d => d !== moduleBaseName),
+    external: dependencies.filter((d) => d !== moduleBaseName),
   })
-  return convertRequiresToImports(result.outputFiles[0].text)
-  //return result.outputFiles[0].text
+  return makeImportsRelative(convertRequiresToImports(result.outputFiles[0].text))
 }
 
+/// Converts require(XXX) calls to import statements and inject a fake require function
+/// This is a bit of a hack and only works for simple cases
+/// TODO: use a proper parser to handle all cases
 function convertRequiresToImports(bundledCode: string): string {
-  let result = bundledCode
+  const addedImports = new Set<string>()
 
-  // // print all occurrences of require(...) calls
-  // result.match(/require\([^)]+\)/g)?.forEach(req => {
-  //   console.log("Found require call:", req)
-  // })
-
-  // Add import statement at the top if there are require calls for react
-  // also handle "scheduler"
-
-  if (result.includes('require("react")') || result.includes('require("react/jsx-runtime")') || result.includes('require("scheduler")')) {
-    const lines = []
-    lines.push('import * as peaque_React from "/@deps/react";')
-    lines.push('import * as peaque_JSX from "/@deps/react/jsx-runtime";')
-    lines.push('import * as peaque_Scheduler from "/@deps/scheduler";')
-
-
-    lines.push('function require(moduleName) { ')
-    lines.push('  console.log("Requiring module:", moduleName);')
-    lines.push('  if (moduleName === "react") return peaque_React;')
-    lines.push('  if (moduleName === "react/jsx-runtime") return peaque_JSX;')
-    lines.push('  if (moduleName === "scheduler") return peaque_Scheduler;')
-    lines.push('  throw new Error("Module not found: " + moduleName);')
-    lines.push('}')
-    lines.push(result)
-    
-    result = lines.join("\n")
+  for (const match of bundledCode.matchAll(/require\(([^)]+)\)/g)) {
+    const requirePath: string = match[1]
+    const importName = `__pq__${requirePath.replace(/["']/g, "").trim()}`
+    const importLine = `import * as ${importName} from ${requirePath};`
+    addedImports.add(importLine)
   }
-  
-  return result
+
+  if (addedImports.size === 0) {
+    return bundledCode
+  }
+
+  const requireLines = []
+  requireLines.push(`function require(path) {`)
+  addedImports.forEach((line) => {
+    const match = line.match(/import \* as (__pq__[^ ]+) from (.+);/)
+    if (match) {
+      const importName = match[1]
+      const importPath = match[2]
+      requireLines.push(`  if (path === ${importPath}) return ${importName};`)
+    }
+  })
+  requireLines.push(`  throw new Error("Cannot find module '" + path + "'");`)
+  requireLines.push(`}`)
+
+  const addedImportsString = Array.from(addedImports.values()).join("\n")
+  const requireString = requireLines.join("\n")
+  return addedImportsString + "\n" + requireString + "\n" + bundledCode
 }
 
+/// Bundles an ESM module using esbuild
+/// This is simpler than the CJS case because we can just re-export everything
+/// and let esbuild handle the tree-shaking and bundling.
+/// We still need to mark dependencies as external to avoid bundling them.
 async function bundleESMModule(moduleName: string, moduleBaseName: string, pkgJson: any, basePath: string): Promise<string> {
   let code = `export * from ${JSON.stringify(moduleBaseName)};\n`
-
   const result = await esbuild.build({
     stdin: {
       contents: code,
@@ -131,27 +117,30 @@ async function bundleESMModule(moduleName: string, moduleBaseName: string, pkgJs
     platform: "browser",
     splitting: false,
     define: { "process.env.NODE_ENV": '"development"' },
-    external: dependencies.filter(d => d !== moduleBaseName && d !== moduleName),
+    external: dependencies.filter((d) => d !== moduleBaseName && d !== moduleName),
   })
-  return convertRequiresToImports(makeImportsRelative(result.outputFiles[0].text))
+  return makeImportsRelative(convertRequiresToImports(result.outputFiles[0].text))
 }
 
+/// Finds the correct module name in node_modules, handling scoped packages and sub-paths
+/// For example, for moduleName = "@scope/package/sub/path", it will check for
+/// "@scope/package", then "@scope", and finally "package" until it finds a package.json
 function findModuleName(moduleName: string, basePath: string): string {
-  // if the moduleName contains any /, check all parts until we find a match
   if (moduleName.includes("/")) {
     const parts = moduleName.split("/")
-    for (let i = 0; i < parts.length; i++) {
-      const attempt = parts.slice(0, i+1).join("/")
-      //console.log(`Checking for module: ${attempt}`)
+    for (let i = parts.length; i > 0; i--) {
+      const attempt = parts.slice(0, i).join("/")
       if (fs.existsSync(path.join(basePath, "node_modules", attempt, "package.json"))) {
         return attempt
       }
     }
-    throw new Error(`Could not find module name for ${moduleName}`)
+    throw new Error(`Could not find any package.json in node_modules for '${moduleName}'`)
   }
   return moduleName
 }
 
+/// Sets the base dependencies from the package.json in the given basePath
+/// This is used to avoid bundling dependencies that are already available in the environment
 export function setBaseDependencies(basePath: string) {
   const pkgPath = path.join(basePath, "package.json")
   if (!fs.existsSync(pkgPath)) {
@@ -162,6 +151,9 @@ export function setBaseDependencies(basePath: string) {
   dependencies.push(...deps)
 }
 
+// Bundles a module from node_modules, handling both CommonJS and ESM modules
+// It first determines the module type by checking the package.json
+// Then it calls the appropriate bundling function
 export async function bundleModuleFromNodeModules(moduleName: string, basePath: string): Promise<string> {
   const moduleBaseName = findModuleName(moduleName, basePath)
 
@@ -170,11 +162,9 @@ export async function bundleModuleFromNodeModules(moduleName: string, basePath: 
 
   const isESM = isESMModule(pkgJson)
 
-  //console.log(`Bundling module: ${moduleName}, isESM: ${isESM}`)
-
   if (!isESM) {
     return await bundleCommonJSModule(moduleName, pkgJson, basePath)
+  } else {
+    return await bundleESMModule(moduleName, moduleBaseName, pkgJson, basePath)
   }
-
-  return await bundleESMModule(moduleName, moduleBaseName, pkgJson, basePath)
 }
