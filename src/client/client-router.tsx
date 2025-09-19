@@ -42,7 +42,6 @@ export type CurrentMatch = {
   pattern: string
   matches: (path: string) => boolean
   path: string
-  linkPrefix: string
   params: Record<string, string>
 }
 const CurrentMatchContext = createContext<CurrentMatch | null>(null)
@@ -54,12 +53,12 @@ export function useNavigate() {
   const match = useCurrentMatch()
   if (!match) throw new Error("useNavigate must be used within a Router")
   return useCallback((path: string) => {
-      let href = match.linkPrefix + path
+      let href = path
       if (href !== "/" && href.endsWith("/")) {
         href = href.slice(0, -1)
       }
       navigate(href)
-    }, [match.linkPrefix])
+    }, [])
 }
 
 export type SearchParams = {
@@ -109,18 +108,17 @@ function matchPath(pattern: string, path: string): Record<string, string> | null
 type MatchResult = {
   component: React.ComponentType<any>
   pattern: string
-  linkPrefix: string
   layouts: React.ComponentType<any>[]
   params: Record<string, string>
   guards: Guard[]
   heads: HeadDefinition[]
 }
 
-function findMatch(root: Route, path: string): MatchResult | null {
+export function findMatch(root: Route, path: string): MatchResult | null {
   const layoutStack: React.ComponentType<any>[] = [...root.layout ? [root.layout] : []]
   const guardStack: Guard[] = [...root.guard ? [root.guard] : []]
   const headStack: HeadDefinition[] = [...root.head ? [root.head] : []]
-  const pattern = []
+  let pattern = ""
 
   // divide the path into segments and traverse the route tree, one segment at a time until we find a match or exhaust the tree
   // nodes in the tree can have a path (static segment) or param (dynamic segment)
@@ -128,47 +126,54 @@ function findMatch(root: Route, path: string): MatchResult | null {
   // if we find a match, we push its layout and guard onto the stack (if any) and continue to the next segment
   // if we don't find a match, we stop and return null
   // if we exhaust all segments and are at a route with a component, we have a match
-  const segments = path === "/" ? [] : path.split("/")
-  let currentRoutes: Route[] = [root]
+  const segments = path === "/" ? [] : path.split("/").filter(Boolean)
+  let currentRoutes: Route[] = root.children || []
   let params: Record<string, string> = {}
 
-  let matchedRoute: Route | null = root
+  let matchedRoute: Route | null = null
   for (const segment of segments) {
+    matchedRoute = null
     for (const route of currentRoutes) {
-      matchedRoute = null
       if (route.param) {
         params[route.param] = segment
-        pattern.push(`:${route.param}`)
-      } else if (route.path === segment || (!route.path && segment === "")) {
-        pattern.push(route.path)
+        pattern += `/:${route.param}`
+        matchedRoute = route
+      } else if (route.path === segment) {
+        pattern += `/${route.path}`
+        matchedRoute = route
       } else {
         continue
       }
       if (route.layout) layoutStack.push(route.layout)
       if (route.guard) guardStack.push(route.guard)
       if (route.head) headStack.push(route.head)
-      matchedRoute = route
       break
     }
-    if (matchedRoute) {
-      currentRoutes = matchedRoute.children || []
-      pattern.push(matchedRoute.path || "")
-    } else {
+    if (!matchedRoute) {
       return null
     }
+    currentRoutes = matchedRoute.children || []
   }
   // After processing all segments, check if we have a matching route with a component
-  if (matchedRoute) {
-    if (matchedRoute.page) {
-      return {
-        component: matchedRoute.page,
-        pattern: pattern.join("/"),
-        linkPrefix: "",
-        layouts: layoutStack,
-        params,
-        guards: guardStack,
-        heads: headStack
-      }
+  if (matchedRoute && matchedRoute.page) {
+    return {
+      component: matchedRoute.page,
+      pattern: pattern || "/",
+      layouts: layoutStack,
+      params,
+      guards: guardStack,
+      heads: headStack
+    }
+  }
+  // Special case for root path "/"
+  if (segments.length === 0 && root.page) {
+    return {
+      component: root.page,
+      pattern: "/",
+      layouts: layoutStack,
+      params: {},
+      guards: guardStack,
+      heads: headStack
     }
   }
   return null
@@ -192,8 +197,7 @@ type LinkProps = {
 } & Omit<React.AnchorHTMLAttributes<HTMLAnchorElement>, "href">
 
 export function Link({ to, children, className, ...rest }: LinkProps) {
-  const currentMatch = useCurrentMatch()
-  let href = (currentMatch?.linkPrefix ?? "") + to
+  let href = to
   if (href !== "/" && href.endsWith("/")) {
     href = href.slice(0, -1)
   }
@@ -267,14 +271,14 @@ type NavLinkProps = {
 
 export function NavLink({ to, className, children, ...rest }: NavLinkProps) {
   const match = useCurrentMatch()
-  let href = (match?.linkPrefix ?? "") + to
+  let href = to
   if (href !== "/" && href.endsWith("/")) {
     href = href.slice(0, -1)
   }
   let isActive = false
   if (match) {
     if (to === "/") {
-      isActive = match.path === match.linkPrefix
+      isActive = match.path === "/"
     } else {
       isActive = match.path === href || match.path.startsWith(href + "/")
     }
@@ -341,7 +345,7 @@ export function Router({ root, fallback = <div>Loading...</div> }: RouterProps):
 
   if (!guardState.match) return <div>404 Not Found</div>
 
-  const { component: Component, layouts, params, pattern, linkPrefix, heads } = guardState.match
+  const { component: Component, layouts, params, pattern, heads } = guardState.match
   document.title = heads.filter(h => h.title).at(-1)?.title || "Peaque App"
   const content = layouts.reduceRight(
     (child, Layout) => <Layout>{child}</Layout>,
@@ -351,7 +355,7 @@ export function Router({ root, fallback = <div>Loading...</div> }: RouterProps):
   )
 
   return (
-    <CurrentMatchContext.Provider value={{ params, pattern, linkPrefix, path, matches: (path) => matchPath(pattern, linkPrefix + path) != null }}>
+    <CurrentMatchContext.Provider value={{ params, pattern, path, matches: (path) => matchPath(pattern, path) != null }}>
       <ParamsContext.Provider value={params}>{content}</ParamsContext.Provider>
     </CurrentMatchContext.Provider>
   )
