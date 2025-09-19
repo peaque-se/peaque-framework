@@ -4,6 +4,7 @@ import { HttpMethod } from "./http-types.js"
 class RouteNode {
   children: Map<string, RouteNode> = new Map()
   paramChild?: { name: string; node: RouteNode }
+  wildcardChild?: { name: string; node: RouteNode }
   handler?: RequestHandler
   originalPath?: string
   middleware: RequestMiddleware[] = [] // Middleware stack for this route
@@ -14,6 +15,7 @@ export class Router {
   private middlewareStack: RequestMiddleware[] = [] // Global middleware stack
   // add a route to the router. the path can contain parameters like /api/user/:id/list
   // e.g. /api/user/:userId/post/:postId
+  // wildcard routes like /file/download/*filepath will capture the rest of the path
   // the parameters will be extracted and returned in the MatchingRoute object
   addRoute(method: HttpMethod, path: string, handler: RequestHandler): Router {
     if (!this.routes.has(method)) {
@@ -29,6 +31,12 @@ export class Router {
           current.paramChild = { name: paramName, node: new RouteNode() }
         }
         current = current.paramChild.node
+      } else if (part.startsWith("*")) {
+        const wildcardName = part.length > 1 ? part.slice(1) : "wildcard"
+        if (!current.wildcardChild) {
+          current.wildcardChild = { name: wildcardName, node: new RouteNode() }
+        }
+        current = current.wildcardChild.node
       } else {
         if (!current.children.has(part)) {
           current.children.set(part, new RouteNode())
@@ -58,16 +66,26 @@ export class Router {
     const parts = path.split("/").filter((p) => p !== "")
     let current = root
     const params: Record<string, string> = {}
-    for (const part of parts) {
+
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i]
+
       if (current.children.has(part)) {
         current = current.children.get(part)!
       } else if (current.paramChild) {
         params[current.paramChild.name] = part
         current = current.paramChild.node
+      } else if (current.wildcardChild) {
+        // Wildcard matches the rest of the path
+        const remainingPath = parts.slice(i).join("/")
+        params[current.wildcardChild.name] = remainingPath
+        current = current.wildcardChild.node
+        break // Wildcard consumes the rest of the path
       } else {
         return undefined
       }
     }
+
     if (current.handler) {
       return {
         method,

@@ -86,7 +86,6 @@ ${head}
     req.type("application/javascript").send(`import * as runtime from "/@deps/react-refresh/runtime"
       runtime.injectIntoGlobalHook(window)
       window.$RefreshReg$ = (file) => (code, id) => {
-        //console.log("RFR POC: $RefreshReg$ called with id", id, "for file", file)
         runtime.register(code, file + "-" + id)
       }
       window.$RefreshSig$ = runtime.createSignatureFunctionForTransform
@@ -151,13 +150,16 @@ if (typeof window !== 'undefined') {
 
   backend.routes.forEach((route) => {
     let apiRoute: Record<HttpMethod, RequestHandler> | null = null
+    let createTime = 0
     let middlewares: Array<RequestMiddleware> = []
 
     route.methods.forEach((method) => {
       router.addRoute(method, route.path, async (req) => {
-        if (apiRoute === null) {
+        const fstat = fs.statSync(path.join(basePath, route.filePath)).mtimeMs
+        if (apiRoute === null || createTime !== fstat) {
           // Load API route module with fresh import
           apiRoute = await moduleLoader.loadModule(route.filePath)
+          createTime = fstat
 
           // Load middlewares lazily with proper concurrency control
           middlewares = []
@@ -180,17 +182,13 @@ if (typeof window !== 'undefined') {
   })
 
   const depsHandler: RequestHandler = async (req) => {
-    const moduleName = req.path().substring(7) // remove /@deps/
+    const moduleName = req.param("moduleName")!
     const moduleContent = await bundleModuleFromNodeModules(moduleName, basePath)
     req.code(200).type("application/javascript").send(moduleContent)
   }
 
   const srcHandler: RequestHandler = async (req) => {
-    let srcPath = req.path().substring(6) // remove /@src/
-    // expand @/ to /src/
-    if (srcPath.startsWith("@/")) {
-      srcPath = "src/" + srcPath.substring(2)
-    }
+    let srcPath = req.param("fileName")!
     const extensions = ["", ".ts", ".tsx", ".js", ".jsx", "/index.ts", "/index.tsx", "/index.js", "/index.jsx"]
     const fullPath = extensions.map((ext) => path.join(basePath, srcPath + ext)).find((p) => fs.existsSync(p) && fs.statSync(p).isFile())
     if (!fullPath) {
@@ -212,26 +210,9 @@ if (typeof window !== 'undefined') {
     }
   }
 
-  router.addRoute("GET", "/@deps/:a", depsHandler)
-  router.addRoute("GET", "/@deps/:a/:b", depsHandler)
-  router.addRoute("GET", "/@deps/:a/:b/:c", depsHandler)
-  router.addRoute("GET", "/@deps/:a/:b/:c/:d", depsHandler)
-  router.addRoute("GET", "/@deps/:a/:b/:c/:d/:e", depsHandler)
-  router.addRoute("GET", "/@deps/:a/:b/:c/:d/:e/:f", depsHandler)
+  router.addRoute("GET", "/@deps/*moduleName", depsHandler)
 
-  router.addRoute("GET", "/@src/:a", srcHandler)
-  router.addRoute("GET", "/@src/:a/:b", srcHandler)
-  router.addRoute("GET", "/@src/:a/:b/:c", srcHandler)
-  router.addRoute("GET", "/@src/:a/:b/:c/:d", srcHandler)
-  router.addRoute("GET", "/@src/:a/:b/:c/:d/:e", srcHandler)
-  router.addRoute("GET", "/@src/:a/:b/:c/:d/:e/:f", srcHandler)
-  router.addRoute("GET", "/@src/:a/:b/:c/:d/:e/:f/:g", srcHandler)
-  router.addRoute("GET", "/@src/:a/:b/:c/:d/:e/:f/:g/:h", srcHandler)
-  router.addRoute("GET", "/@src/:a/:b/:c/:d/:e/:f/:g/:h/:i", srcHandler)
-  router.addRoute("GET", "/@src/:a/:b/:c/:d/:e/:f/:g/:h/:i/:j", srcHandler)
-  router.addRoute("GET", "/@src/:a/:b/:c/:d/:e/:f/:g/:h/:i/:j/:k", srcHandler)
-  router.addRoute("GET", "/@src/:a/:b/:c/:d/:e/:f/:g/:h/:i/:j/:k/:l", srcHandler)
-  router.addRoute("GET", "/@src/:a/:b/:c/:d/:e/:f/:g/:h/:i/:j/:k/:l/:m", srcHandler)
+  router.addRoute("GET", "/@src/*fileName", srcHandler)
 
   router.addRoute("GET", "/hmr", hmrConnectHandler)
 
