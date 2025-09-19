@@ -1,6 +1,6 @@
 {
   "name": "@peaque/framework",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "description": "The last javascript framework ever to be needed",
   "type": "module",
   "license": "MIT",
@@ -32,6 +32,7 @@
   },
   "dependencies": {
     "@esbuild-plugins/tsconfig-paths": "^0.1.2",
+    "@swc/core": "^1.13.5",
     "@tailwindcss/postcss": "^4.1.13",
     "autoprefixer": "^10.4.0",
     "chokidar": "^3.5.0",
