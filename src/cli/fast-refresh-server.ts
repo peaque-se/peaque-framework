@@ -72,7 +72,7 @@ ${head}
   }
 
   const pageRouter = await buildPageRouter(basePath)
-  const mainFile = await generatePageRouterJS(pageRouter, false, "./src")
+  const mainFile = await generatePageRouterJS({ pageRouter, devMode: false, importPrefix: "./src" })
 
   const router = new Router()
   router.fallback(req => req.redirect("/"))
@@ -182,7 +182,7 @@ if (typeof window !== 'undefined') {
   })
 
   router.addRoute("GET", "/peaque.js", async (req) => {
-    const mainFile = await generatePageRouterJS(pageRouter, false, "./src")
+    const mainFile = await generatePageRouterJS({ pageRouter, devMode: false, importPrefix: "./src", createReact: false })
     const fastifyContent = fastRefreshify(mainFile, "_page_router.tsx")
     const processedContents = makeImportsRelative(fastifyContent)
     // set the content type to application/javascript

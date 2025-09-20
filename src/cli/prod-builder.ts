@@ -19,7 +19,7 @@ export const buildForProduction = async (basePath: string) => {
 
   // produce dist/assets/peaque.js
   const pageRouter = await buildPageRouter(basePath)
-  const jsCode = await generatePageRouterJS(pageRouter, false, "../src")
+  const jsCode = await generatePageRouterJS({ pageRouter, devMode: false, importPrefix: "../src" })
   const jsBundler = new FrontendBundler({
     entryContent: jsCode,
     baseDir: outDir,

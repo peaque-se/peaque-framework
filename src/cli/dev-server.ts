@@ -121,10 +121,10 @@ ${head}
       const startTime = Date.now()
 
       const pageRouter = await buildPageRouter(basePath)
-      const mainFile = await generatePageRouterJS(pageRouter, true, "./src")
+      const mainFile = await generatePageRouterJS({ pageRouter, devMode: true, importPrefix: "./src" })
 
       // save mainFile for inspection
-      //const mainFileView = await generatePageRouterJS(pageRouter, true, "../src")
+      //const mainFileView = await generatePageRouterJS({ pageRouter, devMode: true, importPrefix: "../src" })
       //fs.writeFileSync(path.join(basePath, ".peaque/_generated_main.tsx"), mainFileView, "utf-8")
 
       // Update bundler with new content and build/rebuild

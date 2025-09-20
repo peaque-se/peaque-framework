@@ -137,8 +137,19 @@ export async function buildRouterTree(basePath: string): Promise<RouterNode> {
   return nodeMap.get("/")!
 }
 
-export async function generatePageRouterJS(pageRouter: PageRouter, devMode: boolean = false, importPrefix: string = "../src"): Promise<string> {
+export type GeneratePageRouterJSOptions = {
+  pageRouter: PageRouter
+  devMode?: boolean
+  importPrefix?: string
+  createReact?: boolean
+}
+export async function generatePageRouterJS(options: GeneratePageRouterJSOptions): Promise<string> {
+  const { pageRouter, devMode = false, importPrefix = "../src", createReact = true } = options;
   const imports = new Set<string>()
+  if (createReact) {
+    imports.add("import React from 'react'")
+    imports.add("import { createRoot } from 'react-dom/client'")
+  }
   imports.add("import { Router } from '@peaque/framework'")
   if (devMode) {
     imports.add("import { StrictMode } from 'react';")
@@ -216,12 +227,17 @@ export async function generatePageRouterJS(pageRouter: PageRouter, devMode: bool
   }
   const app = devMode ? `<StrictMode><Router ${routerProps} /></StrictMode>` : `<Router ${routerProps} />`
 
-  const result = `${Array.from(imports).join("\n")}
+  if (createReact) {
+    return `${Array.from(imports).join("\n")}
+      const root = ${routerConfig.join("").slice(0, -2)}
+      createRoot(document.getElementById('peaque')!).render(${app});`
+  }
+
+  return `${Array.from(imports).join("\n")}
   const root = ${routerConfig.join("").slice(0, -2)}
   export default function Main() {
     return ${app};
   }`
-  return result
 }
 
 // Compare two file paths by their directory structure, shortest paths first
