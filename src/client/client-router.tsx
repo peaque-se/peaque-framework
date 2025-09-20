@@ -3,7 +3,9 @@ import type { ReactElement, ReactNode } from "react"
 import type { HeadDefinition } from "./head.js"
 
 export type GuardResult = boolean | string | Promise<boolean | string>
-export type Guard = () => GuardResult
+export type GuardParameters = { path: string , params: Record<string, string>, pattern: string }
+export type PageGuard = (params: GuardParameters) => GuardResult
+export type PageMiddleware = (params: GuardParameters) => GuardResult
 
 export type Route = {
   path?: string
@@ -11,14 +13,18 @@ export type Route = {
   page?: React.ComponentType<any>
   layout?: React.ComponentType<any>
   children?: Route[]
-  guard?: Guard
+  guard?: PageGuard
+  middleware?: PageMiddleware
   head?: HeadDefinition
   prefixLinks?: boolean
 }
 
 export type RouterProps = {
   root: Route
-  fallback?: ReactNode
+  loading?: ReactNode
+  missing?: ReactNode
+  error?: ReactNode
+  accessDenied?: ReactNode
 }
 
 const ParamsContext = createContext<Record<string, string>>({})
@@ -110,13 +116,14 @@ type MatchResult = {
   pattern: string
   layouts: React.ComponentType<any>[]
   params: Record<string, string>
-  guards: Guard[]
+  guards: PageGuard[]
+  middleware: PageMiddleware[]
   heads: HeadDefinition[]
 }
 
 export function findMatch(root: Route, path: string): MatchResult | null {
   const layoutStack: React.ComponentType<any>[] = [...root.layout ? [root.layout] : []]
-  const guardStack: Guard[] = [...root.guard ? [root.guard] : []]
+  const guardStack: PageGuard[] = [...root.guard ? [root.guard] : []]
   const headStack: HeadDefinition[] = [...root.head ? [root.head] : []]
   let pattern = ""
 
@@ -133,27 +140,45 @@ export function findMatch(root: Route, path: string): MatchResult | null {
   let matchedRoute: Route | null = null
   for (const segment of segments) {
     matchedRoute = null
+    
+    // First, try to find a path route that matches
     for (const route of currentRoutes) {
-      if (route.param) {
-        params[route.param] = segment
-        pattern += `/:${route.param}`
-        matchedRoute = route
-      } else if (route.path === segment) {
+      if (route.path === segment) {
         pattern += `/${route.path}`
         matchedRoute = route
-      } else {
-        continue
+        break
       }
-      if (route.layout) layoutStack.push(route.layout)
-      if (route.guard) guardStack.push(route.guard)
-      if (route.head) headStack.push(route.head)
-      break
     }
+    
+    // If no path route matched, try param routes
+    if (!matchedRoute) {
+      for (const route of currentRoutes) {
+        if (route.param) {
+          params[route.param] = segment
+          pattern += `/:${route.param}`
+          matchedRoute = route
+          break
+        }
+      }
+    }
+    
     if (!matchedRoute) {
       return null
     }
+    
+    if (matchedRoute.layout) layoutStack.push(matchedRoute.layout)
+    if (matchedRoute.guard) guardStack.push(matchedRoute.guard)
+    if (matchedRoute.head) headStack.push(matchedRoute.head)
+    
     currentRoutes = matchedRoute.children || []
   }
+  
+  // Collect middleware only from the final matched route (non-stackable)
+  const middlewareStack: PageMiddleware[] = []
+  if (matchedRoute?.middleware) {
+    middlewareStack.push(matchedRoute.middleware)
+  }
+  
   // After processing all segments, check if we have a matching route with a component
   if (matchedRoute && matchedRoute.page) {
     return {
@@ -162,6 +187,7 @@ export function findMatch(root: Route, path: string): MatchResult | null {
       layouts: layoutStack,
       params,
       guards: guardStack,
+      middleware: middlewareStack,
       heads: headStack
     }
   }
@@ -173,6 +199,7 @@ export function findMatch(root: Route, path: string): MatchResult | null {
       layouts: layoutStack,
       params: {},
       guards: guardStack,
+      middleware: root.middleware ? [root.middleware] : [],
       heads: headStack
     }
   }
@@ -181,6 +208,11 @@ export function findMatch(root: Route, path: string): MatchResult | null {
 
 export function navigate(path: string) {
   window.history.pushState(null, "", path)
+  window.dispatchEvent(new PopStateEvent("popstate"))
+}
+
+export function redirect(path: string) {
+  window.history.replaceState(null, "", path)
   window.dispatchEvent(new PopStateEvent("popstate"))
 }
 
@@ -291,7 +323,13 @@ export function NavLink({ to, className, children, ...rest }: NavLinkProps) {
   )
 }
 
-export function Router({ root, fallback = <div>Loading...</div> }: RouterProps): ReactElement {
+export function Router({ 
+  root, 
+  loading = <div>Loading...</div>, 
+  missing = <div>404 Not Found</div>, 
+  error = <ErrorPanel />,
+  accessDenied = <div>Access Denied</div>
+}: RouterProps): ReactElement {
   const [path, setPath] = useState(() => window.location.pathname)
   const [guardState, setGuardState] = useState<{
     status: "pending" | "allowed" | "redirect" | "denied" | "404"
@@ -313,9 +351,37 @@ export function Router({ root, fallback = <div>Loading...</div> }: RouterProps):
     }
 
     const runGuards = async () => {
+      // Execute stackable guards first (auth checks, etc.)
       for (const guard of match.guards) {
         try {
-          const result = await guard()
+          const result = await guard({
+            path,
+            params: match.params,
+            pattern: match.pattern
+          })
+          if (result === true) {
+            continue
+          } else if (typeof result === "string") {
+            setGuardState({ status: "redirect", target: result })
+            return
+          } else {
+            setGuardState({ status: "denied" })
+            return
+          }
+        } catch {
+          setGuardState({ status: "denied" })
+          return
+        }
+      }
+
+      // Execute non-stackable middleware (parameter validation, etc.)
+      for (const middleware of match.middleware) {
+        try {
+          const result = await middleware({
+            path,
+            params: match.params,
+            pattern: match.pattern
+          })
           if (result === true) {
             continue
           } else if (typeof result === "string") {
@@ -338,18 +404,18 @@ export function Router({ root, fallback = <div>Loading...</div> }: RouterProps):
     runGuards()
   }, [path, root])
 
-  if (guardState.status === "404") return <div>404 Not Found</div>
-  if (guardState.status === "pending") return <>{fallback}</>
+  if (guardState.status === "404") return <>{missing}</>
+  if (guardState.status === "pending") return <>{loading}</>
   if (guardState.status === "redirect") return <Navigate to={guardState.target!} />
-  if (guardState.status === "denied") return <div>Access Denied</div>
+  if (guardState.status === "denied") return <>{accessDenied}</>
 
-  if (!guardState.match) return <div>404 Not Found</div>
+  if (!guardState.match) return <>{missing}</>
 
   const { component: Component, layouts, params, pattern, heads } = guardState.match
   document.title = heads.filter(h => h.title).at(-1)?.title || "Peaque App"
   const content = layouts.reduceRight(
     (child, Layout) => <Layout>{child}</Layout>,
-    <ErrorBoundary fallback={<ErrorPanel/>} resetKeys={[path]}>
+    <ErrorBoundary fallback={<>{error}</>} resetKeys={[path]}>
       <Component {...params} />
     </ErrorBoundary>
   )

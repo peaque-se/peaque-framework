@@ -3,7 +3,7 @@ import { config } from "dotenv"
 import fs from "fs"
 import path from "path"
 import { generateBackendProgram } from "../compiler/backend-generator.js"
-import { bundleModuleFromNodeModules, setBaseDependencies } from "../compiler/bundle.js"
+import { bundleESMModule, bundleModuleFromNodeModules, setBaseDependencies } from "../compiler/bundle.js"
 import { fastRefreshify } from "../compiler/fast-refreshify.js"
 import { buildPageRouter, FlatRoute, generatePageRouterJS } from "../compiler/frontend-generator.js"
 import { makeImportsRelative, setupImportAliases } from "../compiler/imports.js"
@@ -31,17 +31,17 @@ export async function runFastRefreshServer(basePath: string): Promise<void> {
 
   setBaseDependencies(basePath)
 
-    const defaultHead: HeadDefinition = {
-      title: "Peaque Dev Server",
-      meta: [
-        { name: "viewport", content: "width=device-width, initial-scale=1" },
-        { name: "description", content: "A Peaque Framework Application" },
-      ],
-    }
-  
+  const defaultHead: HeadDefinition = {
+    title: "Peaque Dev Server",
+    meta: [
+      { name: "viewport", content: "width=device-width, initial-scale=1" },
+      { name: "description", content: "A Peaque Framework Application" },
+    ],
+  }
+
   function makeIndexRoute(route: FlatRoute): RequestHandler {
     const headLoader = new ModuleLoader({ absWorkingDir: basePath })
-    let head : string | null = null
+    let head: string | null = null
 
     return async (req) => {
       if (!head) {
@@ -65,17 +65,17 @@ ${head}
 <body>
 <div id="peaque"></div>
 <script type="module" src="/peaque-dev.js"></script>
-<script type="module" src="/peaque.js"></script>
 </body>
 </html>`
       req.type("text/html").send(indexHtml)
     }
   }
-  
+
   const pageRouter = await buildPageRouter(basePath)
-  const mainFile = await generatePageRouterJS(pageRouter, true, "./src")
+  const mainFile = await generatePageRouterJS(pageRouter, false, "./src")
 
   const router = new Router()
+  router.fallback(req => req.redirect("/"))
   pageRouter.routes.forEach((route) => {
     router.addRoute("GET", route.path, makeIndexRoute(route))
   })
@@ -83,13 +83,16 @@ ${head}
   await addAssetRoutesForFolder(router, basePath + "/src/public", "/")
 
   router.addRoute("GET", "/peaque-dev.js", async (req) => {
-    req.type("application/javascript").send(`import * as runtime from "/@deps/react-refresh/runtime"
+    req.type("application/javascript").send(`
+      import * as runtime from "/@deps/react-refresh/runtime"
       runtime.injectIntoGlobalHook(window)
       window.$RefreshReg$ = (file) => (code, id) => {
         runtime.register(code, file + "-" + id)
       }
       window.$RefreshSig$ = runtime.createSignatureFunctionForTransform
       window.performReactRefresh = runtime.performReactRefresh
+
+      import("/peaque-loader.js?t=" + Date.now())
 
       const sheet = new CSSStyleSheet()
       document.adoptedStyleSheets = [sheet]
@@ -109,7 +112,11 @@ if (typeof window !== 'undefined') {
       const message = JSON.parse(event.data);
       replaceStylesheet("/style.css")
       const updatedFile = message.data.path
-      import("/@src/" + updatedFile + "?t=" + Date.now()).then((mod) => {
+      let updatePath = "/@src/" + updatedFile + "?t=" + Date.now()
+      if (updatedFile === "/peaque.js") {
+        updatePath = "/peaque.js?t=" + Date.now()
+      }
+      import(updatePath).then((mod) => {
         //console.log("HMR: Successfully re-imported updated module:", updatedFile, mod);
         window.performReactRefresh();
       }).catch((err) => {
@@ -175,19 +182,40 @@ if (typeof window !== 'undefined') {
   })
 
   router.addRoute("GET", "/peaque.js", async (req) => {
+    const mainFile = await generatePageRouterJS(pageRouter, false, "./src")
     const fastifyContent = fastRefreshify(mainFile, "_page_router.tsx")
     const processedContents = makeImportsRelative(fastifyContent)
     // set the content type to application/javascript
     req.type("application/javascript").send(processedContents)
   })
 
-  const depsHandler: RequestHandler = async (req) => {
+  router.addRoute("GET", "/peaque-loader.js", async (req) => {
+    const loaderContent = `
+      import { createRoot } from 'react-dom/client';
+      import MainApplication from './peaque.js';
+      createRoot(document.getElementById('peaque')!).render(<MainApplication />);`;
+    const fastifyContent = fastRefreshify(loaderContent, "peaque-loader.js")
+    const processedContents = makeImportsRelative(fastifyContent).replace("/@src/peaque", "/peaque.js")
+    // set the content type to application/javascript
+    req.type("application/javascript").send(processedContents)
+  })
+
+  router.addRoute("GET", "/@deps/*moduleName", async (req) => {
     const moduleName = req.param("moduleName")!
+
+    // // for development, we always bundle a fresh copy of the framework
+    // if (moduleName.includes("@peaque/framework")) {
+    //   console.log("Bundling @peaque/framework for", moduleName, "from", process.cwd())
+    //   const moduleContent = await bundleESMModule(moduleName, "@peaque/framework", {}, process.cwd())
+    //   req.code(200).type("application/javascript").send(moduleContent)
+    //   return
+    // }
+
     const moduleContent = await bundleModuleFromNodeModules(moduleName, basePath)
     req.code(200).type("application/javascript").send(moduleContent)
-  }
+  })
 
-  const srcHandler: RequestHandler = async (req) => {
+  router.addRoute("GET", "/@src/*fileName", async (req) => {
     let srcPath = req.param("fileName")!
     const extensions = ["", ".ts", ".tsx", ".js", ".jsx", "/index.ts", "/index.tsx", "/index.js", "/index.jsx"]
     const fullPath = extensions.map((ext) => path.join(basePath, srcPath + ext)).find((p) => fs.existsSync(p) && fs.statSync(p).isFile())
@@ -208,11 +236,7 @@ if (typeof window !== 'undefined') {
       `
       req.type("application/javascript").send(errorContents)
     }
-  }
-
-  router.addRoute("GET", "/@deps/*moduleName", depsHandler)
-
-  router.addRoute("GET", "/@src/*fileName", srcHandler)
+  })
 
   router.addRoute("GET", "/hmr", hmrConnectHandler)
 
@@ -236,6 +260,9 @@ if (typeof window !== 'undefined') {
     console.log("updated file:", event, path)
     if (path.endsWith(".tsx")) {
       notifyConnectedClients({ event, path: path.replace(/\\/g, "/").replace(".tsx", "") })
+    }
+    if (event === "add" || event === "unlink") {
+      notifyConnectedClients({ event, path: "/peaque.js" })
     }
   })
 

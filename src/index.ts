@@ -9,13 +9,16 @@ export {
   useCurrentMatch,
   useSearchParams,
   setSearchParam,
-  navigate
+  navigate,
+  redirect
 } from './client/client-router.js';
 
 export type {
   Route,
   RouterProps,
-  Guard,
+  PageGuard,
+  PageMiddleware,
+  GuardParameters,
   GuardResult,
   CurrentMatch,
   SearchParams

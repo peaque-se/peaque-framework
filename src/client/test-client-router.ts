@@ -34,6 +34,7 @@ const root: Route = {
       path: "skills",
       page: MockPage,
       head: {title:"skills"},
+      guard: () => true, // Stackable: auth check for skills section
       children: [
         {
           path: "summary",
@@ -42,10 +43,12 @@ const root: Route = {
         {
           path: "assessments",
           page: MockPage,
+          guard: () => true, // Stackable: additional auth for assessments
           children: [
             {
               param: "employeeId",
               page: MockPage,
+              middleware: () => true, // Non-stackable: validate employee ID
             },
           ],
         },
@@ -77,6 +80,27 @@ const root: Route = {
         {
           param: "id",
           page: MockPage,
+          middleware: () => true, // Non-stackable: validates customer ID format
+        },
+        {
+          path: "statistics",
+          page: MockPage,
+          middleware: () => true, // Non-stackable: checks permissions for statistics
+        }
+      ],
+    },
+    // Test case: both path and param routes in same children list
+    // The path route "specific" should be matched before the param route "catchall"
+    {
+      path: "test",
+      children: [
+        {
+          path: "specific",
+          page: MockPage,
+        },
+        {
+          param: "catchall",
+          page: MockPage,
         },
       ],
     },
@@ -99,6 +123,10 @@ const testCases = [
   "/meetings/456/view",
   "/customers",
   "/customers/789",
+  "/customers/statistics",
+  // Test cases for path vs param priority
+  "/test/specific",  // Should match the path route, not the param route
+  "/test/anything",  // Should match the param route since "anything" != "specific"
   "/nonexistent",
   "/about/nonexistent",
 ];
@@ -113,6 +141,7 @@ testCases.forEach(path => {
     console.log(`  Params: ${JSON.stringify(result.params)}`);
     console.log(`  Layouts: ${result.layouts.length}`);
     console.log(`  Guards: ${result.guards.length}`);
+    console.log(`  Middleware: ${result.middleware.length}`);
     console.log(`  Heads: ${result.heads.length}`);
   } else {
     console.log("  No match found");

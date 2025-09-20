@@ -102,7 +102,7 @@ function convertRequiresToImports(bundledCode: string): string {
 /// This is simpler than the CJS case because we can just re-export everything
 /// and let esbuild handle the tree-shaking and bundling.
 /// We still need to mark dependencies as external to avoid bundling them.
-async function bundleESMModule(moduleName: string, moduleBaseName: string, pkgJson: any, basePath: string): Promise<string> {
+export async function bundleESMModule(moduleName: string, moduleBaseName: string, pkgJson: any, basePath: string): Promise<string> {
   let code = `export * from ${JSON.stringify(moduleBaseName)};\n`
   const result = await esbuild.build({
     stdin: {

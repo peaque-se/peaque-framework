@@ -13,6 +13,7 @@ class RouteNode {
 export class Router {
   private routes: Map<HttpMethod, RouteNode> = new Map()
   private middlewareStack: RequestMiddleware[] = [] // Global middleware stack
+  private fallbackHandler?: RequestHandler // Fallback handler for unmatched or unresponded requests
   // add a route to the router. the path can contain parameters like /api/user/:id/list
   // e.g. /api/user/:userId/post/:postId
   // wildcard routes like /file/download/*filepath will capture the rest of the path
@@ -50,6 +51,12 @@ export class Router {
     return this
   }
 
+  // Add a fallback handler that is called if no route matches or the request is not responded to
+  fallback(handler: RequestHandler): Router {
+    this.fallbackHandler = handler
+    return this
+  }
+
   // Add middleware to the stack that will be applied to subsequent routes
   use(middleware: RequestMiddleware): Router {
     const newRouter = new Router()
@@ -57,6 +64,8 @@ export class Router {
     newRouter.routes = this.routes
     // Copy the middleware stack and add the new middleware
     newRouter.middlewareStack = [...this.middlewareStack, middleware]
+    // Copy the fallback handler
+    newRouter.fallbackHandler = this.fallbackHandler
     return newRouter
   }
 
@@ -110,15 +119,14 @@ export class Router {
         if (matchingRoute.middleware.length > 0) {
           await executeMiddlewareChain(req, matchingRoute.middleware, matchingRoute.handler)
         } else {
-          return await matchingRoute.handler(req)
+          await matchingRoute.handler(req)
         }
       }
+      // If no route matched or the request wasn't responded to, call the fallback handler
+      if (!req.isResponded() && this.fallbackHandler) {
+        await this.fallbackHandler(req)
+      }
     }
-  }
-
-  reset(): void {
-    // Only reset this instance's middleware stack, keep shared routes
-    this.middlewareStack = []
   }
 }
 

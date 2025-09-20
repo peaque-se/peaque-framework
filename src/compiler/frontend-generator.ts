@@ -16,6 +16,7 @@ export interface FlatRoute {
   guardStack: ComponentImport[]
   layoutStack: ComponentImport[]
   headStack: ComponentImport[]
+  middleware: ComponentImport | null
 }
 
 export interface ComponentImport {
@@ -29,6 +30,7 @@ export interface RouterNode {
   page?: ComponentImport
   layout?: ComponentImport
   guard?: ComponentImport
+  middleware?: ComponentImport
   head?: ComponentImport
   children?: RouterNode[]
 }
@@ -36,12 +38,21 @@ export interface RouterNode {
 export interface PageRouter {
   root: RouterNode
   routes: FlatRoute[]
+  loadingPage: ComponentImport | null
+  missingPage: ComponentImport | null
+  errorPage: ComponentImport | null
+  accessDeniedPage: ComponentImport | null
 }
 
 export async function buildPageRouter(basePath: string): Promise<PageRouter> {
   const root = await buildRouterTree(basePath)
   const routes = flattenRoutes(root)
-  return { root, routes }
+  const pagesDir = path.join(basePath, "src", "pages")
+  const loadingPage = checkSpecialPage(pagesDir, "loading.tsx")
+  const missingPage = checkSpecialPage(pagesDir, "404.tsx")
+  const errorPage = checkSpecialPage(pagesDir, "error.tsx")
+  const accessDeniedPage = checkSpecialPage(pagesDir, "403.tsx")
+  return { root, routes, loadingPage, missingPage, errorPage, accessDeniedPage }
 }
 
 function flattenRoutes(node: RouterNode, parentPath: string = "", parentLayouts: ComponentImport[] = [], parentGuards: ComponentImport[] = [], parentHeads: ComponentImport[] = []): FlatRoute[] {
@@ -54,6 +65,7 @@ function flattenRoutes(node: RouterNode, parentPath: string = "", parentLayouts:
       guardStack: [...parentGuards, node.guard].filter(Boolean) as ComponentImport[],
       layoutStack: [...parentLayouts, node.layout].filter(Boolean) as ComponentImport[],
       headStack: [...parentHeads, node.head].filter(Boolean) as ComponentImport[],
+      middleware: node.middleware || null,
     })
   }
   for (const child of node.children || []) {
@@ -74,10 +86,12 @@ export async function buildRouterTree(basePath: string): Promise<RouterNode> {
   const pageImports = (await glob("**/page.{tsx,jsx,ts,js}", globOptions)).map((f) => makeComponentImport(f, pagesDir)).sort(compareByPath)
   const layoutImports = (await glob("**/layout.{tsx,jsx,ts,js}", globOptions)).map((f) => makeComponentImport(f, pagesDir))
   const guardImports = (await glob("**/guard.{ts,js}", globOptions)).map((f) => makeComponentImport(f, pagesDir))
+  const middlewareImports = (await glob("**/middleware.{ts,js}", globOptions)).map((f) => makeComponentImport(f, pagesDir))
   const headImports = (await glob("**/head.{ts,js}", globOptions)).map((f) => makeComponentImport(f, pagesDir))
 
   const layoutMap = new Map(layoutImports.map((f) => [f.routePath, f]))
   const guardMap = new Map(guardImports.map((f) => [f.routePath, f]))
+  const middlewareMap = new Map(middlewareImports.map((f) => [f.routePath, f]))
   const headMap = new Map(headImports.map((f) => [f.routePath, f]))
 
   const nodeMap = new Map<string, RouterNode>()
@@ -92,6 +106,7 @@ export async function buildRouterTree(basePath: string): Promise<RouterNode> {
       guard: guardMap.get(fullPath),
       head: headMap.get(fullPath),
       children: [],
+      middleware: middlewareMap.get(fullPath),
     }
     nodeMap.set(fullPath, newNode)
 
@@ -114,6 +129,7 @@ export async function buildRouterTree(basePath: string): Promise<RouterNode> {
       layout: layoutMap.get(page.routePath),
       guard: guardMap.get(page.routePath),
       head: headMap.get(page.routePath),
+      middleware: middlewareMap.get(page.routePath),
     }
     parentNode.children.push(newNode)
     nodeMap.set(page.routePath, newNode)
@@ -123,7 +139,6 @@ export async function buildRouterTree(basePath: string): Promise<RouterNode> {
 
 export async function generatePageRouterJS(pageRouter: PageRouter, devMode: boolean = false, importPrefix: string = "../src"): Promise<string> {
   const imports = new Set<string>()
-  imports.add("import { createRoot } from 'react-dom/client';")
   imports.add("import { Router } from '@peaque/framework'")
   if (devMode) {
     imports.add("import { StrictMode } from 'react';")
@@ -156,6 +171,10 @@ export async function generatePageRouterJS(pageRouter: PageRouter, devMode: bool
       routerConfig.push(`${ind}  head: ${node.head.componentName},\n`)
       imports.add(`import ${node.head.componentName} from '${importPrefix}/pages/${node.head.relativePath}'`)
     }
+    if (node.middleware) {
+      routerConfig.push(`${ind}  middleware: ${node.middleware.componentName},\n`)
+      imports.add(`import ${node.middleware.componentName} from '${importPrefix}/pages/${node.middleware.relativePath}'`)
+    }
     if (node.children && node.children.length > 0) {
       routerConfig.push(`${ind}  children: [\n`)
       node.children.forEach((child) => {
@@ -167,12 +186,41 @@ export async function generatePageRouterJS(pageRouter: PageRouter, devMode: bool
   }
   printRoutes(pageRouter.root)
 
+  // Add imports for special pages
+  if (pageRouter.loadingPage) {
+    imports.add(`import ${pageRouter.loadingPage.componentName} from '${importPrefix}/pages/${pageRouter.loadingPage.relativePath}'`)
+  }
+  if (pageRouter.missingPage) {
+    imports.add(`import ${pageRouter.missingPage.componentName} from '${importPrefix}/pages/${pageRouter.missingPage.relativePath}'`)
+  }
+  if (pageRouter.errorPage) {
+    imports.add(`import ${pageRouter.errorPage.componentName} from '${importPrefix}/pages/${pageRouter.errorPage.relativePath}'`)
+  }
+  if (pageRouter.accessDeniedPage) {
+    imports.add(`import ${pageRouter.accessDeniedPage.componentName} from '${importPrefix}/pages/${pageRouter.accessDeniedPage.relativePath}'`)
+  }
+
   // Generate the main component
-  const app = devMode ? "<StrictMode><Router root={root} /></StrictMode>" : "<Router root={root} />"
+  let routerProps = "root={root}"
+  if (pageRouter.loadingPage) {
+    routerProps += ` loading={<${pageRouter.loadingPage.componentName} />}`
+  }
+  if (pageRouter.missingPage) {
+    routerProps += ` missing={<${pageRouter.missingPage.componentName} />}`
+  }
+  if (pageRouter.errorPage) {
+    routerProps += ` error={<${pageRouter.errorPage.componentName} />}`
+  }
+  if (pageRouter.accessDeniedPage) {
+    routerProps += ` accessDenied={<${pageRouter.accessDeniedPage.componentName} />}`
+  }
+  const app = devMode ? `<StrictMode><Router ${routerProps} /></StrictMode>` : `<Router ${routerProps} />`
 
   const result = `${Array.from(imports).join("\n")}
   const root = ${routerConfig.join("").slice(0, -2)}
-  createRoot(document.getElementById('peaque')!).render(${app})`
+  export default function Main() {
+    return ${app};
+  }`
   return result
 }
 
@@ -199,6 +247,21 @@ function makeComponentImport(filePath: string, baseDir: string): ComponentImport
   return { componentName, relativePath, routePath }
 }
 
+function checkSpecialPage(pagesDir: string, fileName: string): ComponentImport | null {
+  const filePath = path.join(pagesDir, fileName)
+  if (fs.existsSync(filePath)) {
+    const relativePath = path.relative(pagesDir, filePath).replace(/\\/g, "/")
+    let componentName: string
+    if (fileName === "loading.tsx") componentName = "Loading"
+    else if (fileName === "404.tsx") componentName = "Missing"
+    else if (fileName === "error.tsx") componentName = "Error"
+    else if (fileName === "403.tsx") componentName = "AccessDenied"
+    else componentName = pathToComponentName(relativePath)
+    return { componentName, relativePath, routePath: "/" }
+  }
+  return null
+}
+
 /**
  * Converts a file path to a component name
  */
@@ -219,6 +282,8 @@ function pathToComponentName(filePath: string): string {
     componentName = componentName ? componentName + "_Layout" : "Root_Layout"
   } else if (normalizedPath.match(/\/guard\.(ts|js)$/)) {
     componentName = componentName ? componentName + "_Guard" : "Root_Guard"
+  } else if (normalizedPath.match(/\/middleware\.(ts|js)$/)) {
+    componentName = componentName ? componentName + "_Middleware" : "Root_Middleware"
   } else if (normalizedPath.match(/\/head\.(ts|js)$/)) {
     componentName = componentName ? componentName + "_Head" : "Root_Head"
   }
