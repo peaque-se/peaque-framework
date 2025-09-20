@@ -3,7 +3,7 @@ import type { ReactElement, ReactNode } from "react"
 import type { HeadDefinition } from "./head.js"
 
 export type GuardResult = boolean | string | Promise<boolean | string>
-export type GuardParameters = { path: string , params: Record<string, string>, pattern: string }
+export type GuardParameters = { path: string; params: Record<string, string>; pattern: string }
 export type PageGuard = (params: GuardParameters) => GuardResult
 export type PageMiddleware = (params: GuardParameters) => GuardResult
 
@@ -34,13 +34,13 @@ export function useParams() {
 
 export function useCurrentPath() {
   const [path, setPath] = useState(() => window.location.pathname)
-  
+
   useEffect(() => {
     const handlePop = () => setPath(window.location.pathname)
     window.addEventListener("popstate", handlePop)
     return () => window.removeEventListener("popstate", handlePop)
   }, [])
-  
+
   return path
 }
 
@@ -59,12 +59,12 @@ export function useNavigate() {
   const match = useCurrentMatch()
   if (!match) throw new Error("useNavigate must be used within a Router")
   return useCallback((path: string) => {
-      let href = path
-      if (href !== "/" && href.endsWith("/")) {
-        href = href.slice(0, -1)
-      }
-      navigate(href)
-    }, [])
+    let href = path
+    if (href !== "/" && href.endsWith("/")) {
+      href = href.slice(0, -1)
+    }
+    navigate(href)
+  }, [])
 }
 
 export type SearchParams = {
@@ -122,9 +122,9 @@ type MatchResult = {
 }
 
 export function findMatch(root: Route, path: string): MatchResult | null {
-  const layoutStack: React.ComponentType<any>[] = [...root.layout ? [root.layout] : []]
-  const guardStack: PageGuard[] = [...root.guard ? [root.guard] : []]
-  const headStack: HeadDefinition[] = [...root.head ? [root.head] : []]
+  const layoutStack: React.ComponentType<any>[] = [...(root.layout ? [root.layout] : [])]
+  const guardStack: PageGuard[] = [...(root.guard ? [root.guard] : [])]
+  const headStack: HeadDefinition[] = [...(root.head ? [root.head] : [])]
   let pattern = ""
 
   // divide the path into segments and traverse the route tree, one segment at a time until we find a match or exhaust the tree
@@ -140,7 +140,7 @@ export function findMatch(root: Route, path: string): MatchResult | null {
   let matchedRoute: Route | null = null
   for (const segment of segments) {
     matchedRoute = null
-    
+
     // First, try to find a path route that matches
     for (const route of currentRoutes) {
       if (route.path === segment) {
@@ -149,7 +149,7 @@ export function findMatch(root: Route, path: string): MatchResult | null {
         break
       }
     }
-    
+
     // If no path route matched, try param routes
     if (!matchedRoute) {
       for (const route of currentRoutes) {
@@ -161,24 +161,24 @@ export function findMatch(root: Route, path: string): MatchResult | null {
         }
       }
     }
-    
+
     if (!matchedRoute) {
       return null
     }
-    
+
     if (matchedRoute.layout) layoutStack.push(matchedRoute.layout)
     if (matchedRoute.guard) guardStack.push(matchedRoute.guard)
     if (matchedRoute.head) headStack.push(matchedRoute.head)
-    
+
     currentRoutes = matchedRoute.children || []
   }
-  
+
   // Collect middleware only from the final matched route (non-stackable)
   const middlewareStack: PageMiddleware[] = []
   if (matchedRoute?.middleware) {
     middlewareStack.push(matchedRoute.middleware)
   }
-  
+
   // After processing all segments, check if we have a matching route with a component
   if (matchedRoute && matchedRoute.page) {
     return {
@@ -188,7 +188,7 @@ export function findMatch(root: Route, path: string): MatchResult | null {
       params,
       guards: guardStack,
       middleware: middlewareStack,
-      heads: headStack
+      heads: headStack,
     }
   }
   // Special case for root path "/"
@@ -200,7 +200,7 @@ export function findMatch(root: Route, path: string): MatchResult | null {
       params: {},
       guards: guardStack,
       middleware: root.middleware ? [root.middleware] : [],
-      heads: headStack
+      heads: headStack,
     }
   }
   return null
@@ -228,61 +228,46 @@ type LinkProps = {
   to: string
 } & Omit<React.AnchorHTMLAttributes<HTMLAnchorElement>, "href">
 
-export function Link({ to, children, className, ...rest }: LinkProps) {
-  let href = to
-  if (href !== "/" && href.endsWith("/")) {
-    href = href.slice(0, -1)
-  }
-
-  const onClick = (e: React.MouseEvent) => {
-    // Allow default browser behavior for middle-click, ctrl+click, shift+click, etc.
-    if (e.button !== 0 || e.ctrlKey || e.shiftKey || e.altKey || e.metaKey) {
-      return
+export function Link({ to, children, className, onClick, ...rest }: LinkProps) {
+  const href = (to !== "/" && to.endsWith("/")) ? to.slice(0, -1) : to
+  const handleClick = (e: React.MouseEvent) => {
+    if (e.button === 0 && !e.ctrlKey && !e.shiftKey && !e.altKey && !e.metaKey) {
+      e.preventDefault()
+      navigate(href)
     }
-    e.preventDefault()
-    navigate(href)
+    onClick?.(e as any)
   }
-
-  return (
-    <a href={href} onClick={onClick} className={className} {...rest}>
-      {children}
-    </a>
-  )
+  return (<a href={href} onClick={handleClick} className={className} {...rest}>{children}</a>)
 }
 
-class ErrorBoundary extends Component<
-  { children: ReactNode; fallback: ReactElement; resetKeys?: any[] },
-  { hasError: boolean }
-> {
+class ErrorBoundary extends Component<{ children: ReactNode; fallback: ReactElement; resetKeys?: any[] }, { hasError: boolean }> {
   constructor(props: any) {
-    super(props);
-    this.state = { hasError: false };
+    super(props)
+    this.state = { hasError: false }
   }
 
   static getDerivedStateFromError() {
-    return { hasError: true };
+    return { hasError: true }
   }
 
   componentDidCatch(error: Error, errorInfo: any) {
-    console.error('Router Error Boundary caught an error:', error, errorInfo);
+    console.error("Router Error Boundary caught an error:", error, errorInfo)
   }
 
   componentDidUpdate(prevProps: any) {
     if (this.props.resetKeys && prevProps.resetKeys) {
-      const resetKeysDifferent = this.props.resetKeys.some((key, index) => 
-        key !== prevProps.resetKeys[index]
-      );
+      const resetKeysDifferent = this.props.resetKeys.some((key, index) => key !== prevProps.resetKeys[index])
       if (resetKeysDifferent && this.state.hasError) {
-        this.setState({ hasError: false });
+        this.setState({ hasError: false })
       }
     }
   }
 
   render() {
     if (this.state.hasError) {
-      return this.props.fallback;
+      return this.props.fallback
     }
-    return this.props.children;
+    return this.props.children
   }
 }
 
@@ -291,7 +276,11 @@ const ErrorPanel = () => {
     <div className="p-4 m-4 bg-slate-300 rounded-xl">
       <h1 className="mb-2">Error</h1>
       <p>An unexpected error has occurred. Please try to reload the page.</p>
-      <p><button onClick={()=>window.location.reload()} className="mt-4">Reload page</button></p>
+      <p>
+        <button onClick={() => window.location.reload()} className="mt-4">
+          Reload page
+        </button>
+      </p>
     </div>
   )
 }
@@ -323,13 +312,7 @@ export function NavLink({ to, className, children, ...rest }: NavLinkProps) {
   )
 }
 
-export function Router({ 
-  root, 
-  loading = <div>Loading...</div>, 
-  missing = <div>404 Not Found</div>, 
-  error = <ErrorPanel />,
-  accessDenied = <div>Access Denied</div>
-}: RouterProps): ReactElement {
+export function Router({ root, loading = <div>Loading...</div>, missing = <div>404 Not Found</div>, error = <ErrorPanel />, accessDenied = <div>Access Denied</div> }: RouterProps): ReactElement {
   const [path, setPath] = useState(() => window.location.pathname)
   const [guardState, setGuardState] = useState<{
     status: "pending" | "allowed" | "redirect" | "denied" | "404"
@@ -357,7 +340,7 @@ export function Router({
           const result = await guard({
             path,
             params: match.params,
-            pattern: match.pattern
+            pattern: match.pattern,
           })
           if (result === true) {
             continue
@@ -380,7 +363,7 @@ export function Router({
           const result = await middleware({
             path,
             params: match.params,
-            pattern: match.pattern
+            pattern: match.pattern,
           })
           if (result === true) {
             continue
@@ -412,7 +395,7 @@ export function Router({
   if (!guardState.match) return <>{missing}</>
 
   const { component: Component, layouts, params, pattern, heads } = guardState.match
-  document.title = heads.filter(h => h.title).at(-1)?.title || "Peaque App"
+  document.title = heads.filter((h) => h.title).at(-1)?.title || "Peaque App"
   const content = layouts.reduceRight(
     (child, Layout) => <Layout>{child}</Layout>,
     <ErrorBoundary fallback={<>{error}</>} resetKeys={[path]}>

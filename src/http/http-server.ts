@@ -129,7 +129,7 @@ export class HttpServer {
     return deferredWs
   }
 
-  startServer(port: number): void {
+  async startServer(port: number): Promise<void> {
     this.server = http.createServer(async (req: http.IncomingMessage, res: http.ServerResponse) => {
       const url = req.url || "/"
       const requestPath = url.split("?")[0]
@@ -222,7 +222,10 @@ export class HttpServer {
     // Set up WebSocket server for upgrade handling
     this.wss = new WebSocketServer({ noServer: true })
 
-    this.server.listen(port)
+    return new Promise((resolve, reject) => {
+      this.server!.listen(port, () => resolve())
+      this.server!.on('error', reject)
+    })
   }
 
   stop() {

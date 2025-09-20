@@ -1,6 +1,7 @@
 import chokidar from "chokidar"
 import { config } from "dotenv"
 import fs from "fs"
+import net from "net"
 import path from "path"
 import { generateBackendProgram } from "../compiler/backend-generator.js"
 import { bundleESMModule, bundleModuleFromNodeModules, setBaseDependencies } from "../compiler/bundle.js"
@@ -17,7 +18,7 @@ import { HeadDefinition } from "../index.js"
 import { mergeHead, renderHead } from "../client/head.js"
 import { addAssetRoutesForFolder } from "../http/index.js"
 
-export async function runFastRefreshServer(basePath: string): Promise<void> {
+export async function runFastRefreshServer(basePath: string, port: number, noStrict: boolean): Promise<void> {
   config({ path: path.join(basePath, ".env"), override: true }) // re-load .env variables on each rebuild
   config({ path: path.join(basePath, ".env.local"), override: true }) // re-load .env variables on each rebuild
 
@@ -72,7 +73,6 @@ ${head}
   }
 
   const pageRouter = await buildPageRouter(basePath)
-  const mainFile = await generatePageRouterJS({ pageRouter, devMode: false, importPrefix: "./src" })
 
   const router = new Router()
   router.fallback(req => req.redirect("/"))
@@ -107,7 +107,7 @@ if (typeof window !== 'undefined') {
   const maxAttempts = 5;
 
   function connect() {
-    const ws = new WebSocket('ws://localhost:3000/hmr');
+    const ws = new WebSocket('ws://localhost:${port}/hmr');
     ws.onmessage = (event) => {
       const message = JSON.parse(event.data);
       replaceStylesheet("/style.css")
@@ -182,7 +182,7 @@ if (typeof window !== 'undefined') {
   })
 
   router.addRoute("GET", "/peaque.js", async (req) => {
-    const mainFile = await generatePageRouterJS({ pageRouter, devMode: false, importPrefix: "./src", createReact: false })
+    const mainFile = await generatePageRouterJS({ pageRouter, devMode: !noStrict, importPrefix: "./src", createReact: false })
     const fastifyContent = fastRefreshify(mainFile, "_page_router.tsx")
     const processedContents = makeImportsRelative(fastifyContent)
     // set the content type to application/javascript
@@ -247,8 +247,23 @@ if (typeof window !== 'undefined') {
   }
 
   const server = new HttpServer(outermostHandler)
-  await server.startServer(3000)
-  console.log(`🚀  Fast Refresh server running at http://localhost:3000 for project at ${basePath}`)
+  try {
+    await server.startServer(port)
+    console.log(`🌍  \x1b[1m\x1b[33mPeaque Framework\x1b[0m server running`)
+    console.log(`     \x1b[32m✓\x1b[0m Local \x1b[4mhttp://localhost:${port}\x1b[0m`)
+    console.log(`     \x1b[32m✓\x1b[0m Base path \x1b[90m${basePath}\x1b[0m`)
+    if (noStrict) {
+      console.log("     \x1b[32m✓\x1b[0m React Strict Mode is \x1b[1mdisabled\x1b[0m")
+    }
+    console.log(`     \x1b[32m✓\x1b[0m Have fun coding!`)
+  } catch (error: any) {
+    if (error.code === 'EADDRINUSE') {
+      console.error(`❌ Port ${port} is already in use. Please choose a different port or stop the process using it.`)
+    } else {
+      console.error(`❌ Failed to start server:`, error.message)
+    }
+    process.exit(1)
+  }
 
   const watcher = chokidar.watch(basePath, {
     cwd: basePath,

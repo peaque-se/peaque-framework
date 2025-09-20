@@ -14,9 +14,9 @@ import { getHmrClientJs, hmrConnectHandler, notifyConnectedClients } from "../hm
 import { executeMiddlewareChain } from "../http/http-router.js"
 import { HeadDefinition, mergeHead, renderHead } from "../client/head.js"
 
-export const runDevelopmentServer = async (basePath: string) => {
+export const runDevelopmentServer = async (basePath: string, port: number, noStrict: boolean) => {
 
-  console.log(`🚀 Starting Peaque development server on http://localhost:3000`)
+  console.log(`🚀 Starting Peaque development server on http://localhost:${port}`)
   console.log(`   Base path: ${basePath}`)
 
   // make sure there is a @peaque/framework dependency in package.json
@@ -50,7 +50,7 @@ export const runDevelopmentServer = async (basePath: string) => {
   }
 
   // prepare some js
-  const hmrClientContent = getHmrClientJs(3000)
+  const hmrClientContent = getHmrClientJs(port)
   const peaqueDevJsRoute: RequestHandler = async (req) => {
     const devcontent = 'window.process = { env: { NODE_ENV: "development" } };' + "\n" + hmrClientContent + "\n"
     req.type("application/javascript").send(devcontent)
@@ -121,7 +121,7 @@ ${head}
       const startTime = Date.now()
 
       const pageRouter = await buildPageRouter(basePath)
-      const mainFile = await generatePageRouterJS({ pageRouter, devMode: true, importPrefix: "./src" })
+      const mainFile = await generatePageRouterJS({ pageRouter, devMode: !noStrict, importPrefix: "./src" })
 
       // save mainFile for inspection
       //const mainFileView = await generatePageRouterJS({ pageRouter, devMode: true, importPrefix: "../src" })
@@ -233,7 +233,7 @@ ${head}
   })
 
   const server = new HttpServer(outermostHandler)
-  await server.startServer(3000)
+  await server.startServer(port)
 
   // Cleanup function to dispose of resources
   async function cleanup() {
