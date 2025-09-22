@@ -1,4 +1,5 @@
 import { PeaqueWebSocket, RequestHandler } from "../http/http-types.js"
+import colors from "yoctocolors"
 
 const connectedClients = new Set<PeaqueWebSocket>()
 
@@ -33,7 +34,7 @@ export const hmrConnectHandler: RequestHandler = async (req) => {
   }
 }
 
-export function notifyConnectedClients(data: any = {}) {
+export function notifyConnectedClients(data: any = {}, reason = "application") {
   if (connectedClients.size > 0) {
     connectedClients.forEach((ws) => {
       if (ws.isOpen()) {
@@ -42,6 +43,6 @@ export function notifyConnectedClients(data: any = {}) {
         connectedClients.delete(ws)
       }
     })
-    console.log(`📡 Notified ${connectedClients.size} clients about changes`)
+    console.log(`📡 Updated ${colors.gray(reason)} (${connectedClients.size} client${connectedClients.size === 1 ? "" : "s"})`)
   }
 }

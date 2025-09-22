@@ -272,10 +272,13 @@ export async function generateBackendProgram(options: {
 
   const startupFunction = [
     'async function main() {',
+    ' const args = process.argv.slice(3)',
+    ' const portIndex = args.findIndex(arg => arg === "-p" || arg === "--port")',
+    ' const port = portIndex !== -1 && args.length > portIndex + 1 ? parseInt(args[portIndex + 1], 10) : 3000',
     ' const router = await makeBackendRouter()',
     ' const server = new HttpServer(router.getRequestHandler())',
-    ' server.startServer(3000)',
-    ' console.log("🚀  Server started on http://localhost:3000")',
+    ' server.startServer(port)',
+    ' console.log("🚀  Server started on http://localhost:" + port)',
     '}',
     'main()',
   ].join('\n')

@@ -1,10 +1,10 @@
 import chokidar from "chokidar"
 import { config } from "dotenv"
 import fs from "fs"
-import net from "net"
 import path from "path"
+import colors from "yoctocolors"
 import { generateBackendProgram } from "../compiler/backend-generator.js"
-import { bundleESMModule, bundleModuleFromNodeModules, setBaseDependencies } from "../compiler/bundle.js"
+import { bundleModuleFromNodeModules, setBaseDependencies } from "../compiler/bundle.js"
 import { fastRefreshify } from "../compiler/fast-refreshify.js"
 import { buildPageRouter, FlatRoute, generatePageRouterJS } from "../compiler/frontend-generator.js"
 import { makeImportsRelative, setupImportAliases } from "../compiler/imports.js"
@@ -17,6 +17,7 @@ import { HttpMethod, PeaqueRequest, RequestHandler, RequestMiddleware } from "..
 import { HeadDefinition } from "../index.js"
 import { mergeHead, renderHead } from "../client/head.js"
 import { addAssetRoutesForFolder } from "../http/index.js"
+import { JobsRunner } from "../jobs/jobs-runner.js"
 
 export async function runFastRefreshServer(basePath: string, port: number, noStrict: boolean): Promise<void> {
   config({ path: path.join(basePath, ".env"), override: true }) // re-load .env variables on each rebuild
@@ -75,7 +76,7 @@ ${head}
   const pageRouter = await buildPageRouter(basePath)
 
   const router = new Router()
-  router.fallback(req => req.redirect("/"))
+  router.fallback((req) => req.redirect("/"))
   pageRouter.routes.forEach((route) => {
     router.addRoute("GET", route.path, makeIndexRoute(route))
   })
@@ -193,7 +194,7 @@ if (typeof window !== 'undefined') {
     const loaderContent = `
       import { createRoot } from 'react-dom/client';
       import MainApplication from './peaque.js';
-      createRoot(document.getElementById('peaque')!).render(<MainApplication />);`;
+      createRoot(document.getElementById('peaque')!).render(<MainApplication />);`
     const fastifyContent = fastRefreshify(loaderContent, "peaque-loader.js")
     const processedContents = makeImportsRelative(fastifyContent).replace("/@src/peaque", "/peaque.js")
     // set the content type to application/javascript
@@ -249,21 +250,24 @@ if (typeof window !== 'undefined') {
   const server = new HttpServer(outermostHandler)
   try {
     await server.startServer(port)
-    console.log(`🌍  \x1b[1m\x1b[33mPeaque Framework\x1b[0m server running`)
-    console.log(`     \x1b[32m✓\x1b[0m Local \x1b[4mhttp://localhost:${port}\x1b[0m`)
-    console.log(`     \x1b[32m✓\x1b[0m Base path \x1b[90m${basePath}\x1b[0m`)
+    console.log(`🌍  ${colors.bold(colors.yellow("Peaque Framework"))} server running`)
+    console.log(`     ${colors.green("✓")} Local ${colors.underline(`http://localhost:${port}`)}`)
+    console.log(`     ${colors.green("✓")} Base path ${colors.gray(`${basePath}`)}`)
     if (noStrict) {
-      console.log("     \x1b[32m✓\x1b[0m React Strict Mode is \x1b[1mdisabled\x1b[0m")
+      console.log(`     ${colors.green("✓")} React Strict Mode is ${colors.bold("disabled")}`)
     }
-    console.log(`     \x1b[32m✓\x1b[0m Have fun coding!`)
+    console.log(`     ${colors.green("✓")} Have fun coding!`)
   } catch (error: any) {
-    if (error.code === 'EADDRINUSE') {
+    if (error.code === "EADDRINUSE") {
       console.error(`❌ Port ${port} is already in use. Please choose a different port or stop the process using it.`)
     } else {
       console.error(`❌ Failed to start server:`, error.message)
     }
     process.exit(1)
   }
+
+  const jobsRunner = new JobsRunner(basePath)
+  await jobsRunner.startOrUpdateJobs()
 
   const watcher = chokidar.watch(basePath, {
     cwd: basePath,
@@ -272,12 +276,17 @@ if (typeof window !== 'undefined') {
   })
 
   watcher.on("all", (event, path) => {
-    console.log("updated file:", event, path)
+    path = path.replace(/\\/g, "/") // normalize Windows paths
     if (path.endsWith(".tsx")) {
-      notifyConnectedClients({ event, path: path.replace(/\\/g, "/").replace(".tsx", "") })
+      notifyConnectedClients({ event, path: path.replace(".tsx", "") }, path)
     }
     if (event === "add" || event === "unlink") {
-      notifyConnectedClients({ event, path: "/peaque.js" })
+      notifyConnectedClients({ event, path: "/peaque.js" }, "main router")
+    }
+    if (path.startsWith("src/jobs/") && path.endsWith("job.ts")) {
+      jobsRunner.startOrUpdateJobs().catch((err) => {
+        console.error("Error updating jobs:", err)
+      })
     }
   })
 
