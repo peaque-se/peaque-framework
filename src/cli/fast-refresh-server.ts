@@ -239,12 +239,23 @@ if (typeof window !== 'undefined') {
     }
   })
 
+  // EXPERIMENTAL: if basePath/src/middleware.ts exists, load it and use it as global middleware
+  const globalMiddlewarePath = path.join(basePath, "src", "middleware.ts")
+  let globalMiddleware: RequestMiddleware | null = null
+  if (fs.existsSync(globalMiddlewarePath)) {
+    globalMiddleware = await moduleLoader.loadExport<RequestMiddleware>("src/middleware.ts", "middleware")
+  }
+
   router.addRoute("GET", "/hmr", hmrConnectHandler)
 
   const requestHandler = router.getRequestHandler()
 
   const outermostHandler: RequestHandler = async (req: PeaqueRequest) => {
-    return await requestHandler(req)
+    if (globalMiddleware) {
+      await executeMiddlewareChain(req, [globalMiddleware], requestHandler)
+    } else {
+      return await requestHandler(req)
+    }
   }
 
   const server = new HttpServer(outermostHandler)
