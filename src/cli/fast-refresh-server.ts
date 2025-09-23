@@ -19,7 +19,7 @@ import { mergeHead, renderHead } from "../client/head.js"
 import { addAssetRoutesForFolder } from "../http/index.js"
 import { JobsRunner } from "../jobs/jobs-runner.js"
 
-export async function runFastRefreshServer(basePath: string, port: number, noStrict: boolean): Promise<void> {
+export async function runFastRefreshServer(basePath: string, port: number, noStrict: boolean): Promise<HttpServer> {
   config({ path: path.join(basePath, ".env"), override: true }) // re-load .env variables on each rebuild
   config({ path: path.join(basePath, ".env.local"), override: true }) // re-load .env variables on each rebuild
 
@@ -312,4 +312,6 @@ if (typeof window !== 'undefined') {
   process.on("SIGINT", cleanup)
   process.on("SIGTERM", cleanup)
   process.on("SIGUSR2", cleanup) // For nodemon restarts
+
+  return server
 }
