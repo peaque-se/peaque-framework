@@ -272,7 +272,7 @@ export async function generateBackendProgram(options: {
 
   const startupFunction = [
     'async function main() {',
-    ' const args = process.argv.slice(3)',
+    ' const args = process.argv.slice(1)',
     ' const portIndex = args.findIndex(arg => arg === "-p" || arg === "--port")',
     ' const port = portIndex !== -1 && args.length > portIndex + 1 ? parseInt(args[portIndex + 1], 10) : 3000',
     ' const router = await makeBackendRouter()',

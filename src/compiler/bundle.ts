@@ -103,7 +103,7 @@ function convertRequiresToImports(bundledCode: string): string {
 /// and let esbuild handle the tree-shaking and bundling.
 /// We still need to mark dependencies as external to avoid bundling them.
 export async function bundleESMModule(moduleName: string, moduleBaseName: string, pkgJson: any, basePath: string): Promise<string> {
-  let code = `export * from ${JSON.stringify(moduleBaseName)};\n`
+  let code = `export * from ${JSON.stringify(moduleName)};\n`
   const result = await esbuild.build({
     stdin: {
       contents: code,
