@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 
 import { spawn } from "child_process"
-import { runDevelopmentServer } from "./dev-server.js"
 import { buildForProduction } from "./prod-builder.js"
 import path from "path"
 import fs from "fs"
@@ -23,7 +22,7 @@ function showHelp() {
   console.log("")
   console.log("Commands:")
   console.log("  dev     Start development server")
-  console.log("  hmr     Start development server with HMR (experimental)")
+  console.log("  hmr     Start development server with HMR (alias for dev)")
   console.log("  build   Build the application for production")
   console.log("  start   Start the production server")
   console.log("")
@@ -35,9 +34,7 @@ function showHelp() {
 }
 
 async function main() {
-  if (command === "dev") {
-    await runDevelopmentServer(basePath, port, noStrict)
-  } else if (command === "hmr") {
+  if (command === "dev" || command === "hmr") {
     await runFastRefreshServer(basePath, port, noStrict)
   } else if (command === "build") {
     await buildForProduction(basePath)

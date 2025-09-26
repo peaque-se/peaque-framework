@@ -17,7 +17,12 @@
     "allowSyntheticDefaultImports": true,
     "moduleResolution": "NodeNext",
     "types": ["node"],
-    "jsx": "react-jsx"
+    "jsx": "react-jsx",
+    "paths": {
+      "@peaque/framework": ["./src/index.ts"],
+      "@peaque/framework/server": ["./src/http/index.ts"],
+      "@peaque/framework/server/hostname-handlers": ["./src/http/hostname-handlers/index.ts"],
+    }
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]

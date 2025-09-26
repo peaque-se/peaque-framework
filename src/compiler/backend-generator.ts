@@ -252,6 +252,18 @@ export async function generateBackendProgram(options: {
     absolute: true
   })
 
+  // if there is a middleware file in the root of src, it should be applied to all routes
+  let rootMiddleware = null
+  if (fs.existsSync(path.join(baseDir, 'src', 'middleware.ts'))) {
+    rootMiddleware = "import { middleware as AbsoluteRootMiddleware } from '" + importPrefix + 'src/middleware.ts' + "'"
+  }
+
+  // if there is a startup.ts file in the root of src, import it for side effects
+  let startupImport = ''
+  if (fs.existsSync(path.join(baseDir, 'src', 'startup.ts'))) {
+    startupImport = "import * as ThrowawayStartup from '" + importPrefix + 'src/startup.ts' + "'"
+  }
+
   // Organize files by directory structure
   const directoryStructure = await organizeByDirectory(apiDir, routeFiles, middlewareFiles, apiDirPath)
 
@@ -260,6 +272,9 @@ export async function generateBackendProgram(options: {
 
   // Generate the complete output
   const routerFunction = [
+    rootMiddleware,
+    startupImport,
+    rootMiddleware ? 'import { executeMiddlewareChain } from "@peaque/framework/server"' : '',
     '',
     'export async function makeBackendRouter() {',
     '  const router = new Router()',
@@ -268,7 +283,7 @@ export async function generateBackendProgram(options: {
     options.additionalRouterCode || '',
     '  return router',
     '}'
-  ].join('\n')
+  ].filter(Boolean).join('\n')
 
   const startupFunction = [
     'async function main() {',
@@ -276,7 +291,8 @@ export async function generateBackendProgram(options: {
     ' const portIndex = args.findIndex(arg => arg === "-p" || arg === "--port")',
     ' const port = portIndex !== -1 && args.length > portIndex + 1 ? parseInt(args[portIndex + 1], 10) : 3000',
     ' const router = await makeBackendRouter()',
-    ' const server = new HttpServer(router.getRequestHandler())',
+    ' const handler = ' + (rootMiddleware ? 'async (req) => { await executeMiddlewareChain(req, [AbsoluteRootMiddleware], router.getRequestHandler()) }' : 'router.getRequestHandler()'),
+    ' const server = new HttpServer(handler)',
     ' server.startServer(port)',
     ' console.log("🚀  Server started on http://localhost:" + port)',
     '}',

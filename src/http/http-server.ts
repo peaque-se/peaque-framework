@@ -1,9 +1,9 @@
 import http from "http"
-import https from "https"
 import { WebSocket, WebSocketServer } from "ws"
 import { CookieJarImpl, PeaqueRequestImpl } from "./default-impl.js"
 import { parseRequestBody } from "./http-bodyparser.js"
 import { HttpMethod, PeaqueWebSocket, RequestHandler, WebSocketHandler } from "./http-types.js"
+import { CustomHostNameNodeHandler } from "@peaque/framework/server/hostname-handlers"
 
 class DeferredPeaqueWebSocket implements PeaqueWebSocket {
   private ws?: WebSocket
@@ -88,20 +88,9 @@ export class HttpServer {
   private handler: RequestHandler
   private server = null as http.Server | null
   private wss?: WebSocketServer
-  private hostProxies: Record<string, string> = {}
 
   constructor(handler: RequestHandler) {
     this.handler = handler
-  }
-
-  /// EXPERIMENTAL: add a host proxy mapping
-  addHostProxy(hostName: string, targetBase: string): void {
-    this.hostProxies[hostName] = targetBase
-  }
-
-  /// EXPERIMENTAL: remove a host proxy mapping
-  removeHostProxy(hostName: string): void {
-    delete this.hostProxies[hostName]
   }
 
   handleWebSocketUpgrade(req: http.IncomingMessage, res: http.ServerResponse, handler: WebSocketHandler): PeaqueWebSocket {
@@ -144,28 +133,9 @@ export class HttpServer {
   async startServer(port: number): Promise<void> {
     this.server = http.createServer(async (req: http.IncomingMessage, res: http.ServerResponse) => {
 
-      if (this.hostProxies[req.headers.host || ""]) {
-        // Proxy the request to the target host
-        const targetBase = this.hostProxies[req.headers.host || ""]
-        const targetUrl = new URL(req.url || "/", targetBase).toString()
-        const url = new URL(targetUrl)
-        const client = url.protocol === 'https:' ? https : http
-        const proxyHeaders = { ...req.headers, host: url.host }
-        const proxyReq = client.request(targetUrl, {
-          method: req.method,
-          headers: proxyHeaders,
-          timeout: 5000,
-        }, (proxyRes) => {
-          res.writeHead(proxyRes.statusCode || 502, proxyRes.headers)
-          proxyRes.pipe(res, { end: true })
-        })
-        proxyReq.on("error", (err) => {
-          console.error("Error in proxy request:", err)
-          res.writeHead(502, { "Content-Type": "text/plain" })
-          res.end("502 - Bad Gateway")
-        })
-        req.pipe(proxyReq, { end: true })
-        return
+      const hostHandler = CustomHostNameNodeHandler[req.headers.host || ""]
+      if (hostHandler) {
+        return await hostHandler(req, res)
       }
 
       const url = req.url || "/"

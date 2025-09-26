@@ -48,7 +48,7 @@ export const buildForProduction = async (basePath: string) => {
   // produce all distinct versions of head stacks and create the routings for index.html
   const indexRouter : string[] = []
   const defaultHead: HeadDefinition = {
-    title: "Peaque Dev Server",
+    title: "Peaque Framework Application",
     meta: [
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { name: "description", content: "A Peaque Framework Application" },
@@ -119,12 +119,12 @@ require("./server_without_env.js")
     baseDir: outDir,
     outfile: path.join(outDir, "main.js"),
     inputContent: mainJs,
-    minify: true,
-    sourcemap: false,
+    minify: false,
+    sourcemap: true,
   })
 
   // remove server_without_env.js
-  fs.unlinkSync(path.join(outDir, "server_without_env.js"))
+  // fs.unlinkSync(path.join(outDir, "server_without_env.js"))
 
   const endTime = Date.now()
   console.log("✅  Production build completed successfully in " + ((endTime - startTime) / 1000).toFixed(2) + " seconds")

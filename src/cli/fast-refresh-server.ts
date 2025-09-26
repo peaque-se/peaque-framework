@@ -246,6 +246,13 @@ if (typeof window !== 'undefined') {
     globalMiddleware = await moduleLoader.loadExport<RequestMiddleware>("src/middleware.ts", "middleware")
   }
 
+  // EXPERIMENTAL: if basePath/src/startup.ts exists, load it 
+  const globalStartupPath = path.join(basePath, "src", "startup.ts")
+  let globalStartup = null
+  if (fs.existsSync(globalStartupPath)) {
+    globalStartup = await moduleLoader.loadModule("src/startup.ts")
+  }
+
   router.addRoute("GET", "/hmr", hmrConnectHandler)
 
   const requestHandler = router.getRequestHandler()
