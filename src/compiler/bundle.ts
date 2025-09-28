@@ -55,7 +55,7 @@ async function bundleCommonJSModule(moduleName: string, pkgJson: any, basePath: 
     bundle: true,
     format: "esm",
     write: false,
-    platform: "neutral",
+    platform: "browser",
     splitting: false,
     define: { "process.env.NODE_ENV": '"development"' },
     external: dependencies.filter((d) => d !== moduleBaseName),

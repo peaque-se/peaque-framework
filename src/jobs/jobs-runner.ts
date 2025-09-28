@@ -19,13 +19,15 @@ interface RegisteredJob {
 export class JobsRunner {
   private jobsFromFiles = new Map<string, RegisteredJob>()
   private jobsDir: string
+  private baseDir: string
 
   constructor(baseDir: string) {
+    this.baseDir = baseDir
     this.jobsDir = path.join(baseDir, "src", "jobs")
   }
 
   async startOrUpdateJobs() {
-    const moduleLoader = new ModuleLoader()
+    const moduleLoader = new ModuleLoader({ absWorkingDir: this.baseDir })
     const jobFiles = await glob(`${this.jobsDir}/**/*job.ts`)
     for (const file of jobFiles) {
       const hash = await hashFile(file)

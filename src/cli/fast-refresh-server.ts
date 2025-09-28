@@ -76,7 +76,7 @@ ${head}
   const pageRouter = await buildPageRouter(basePath)
 
   const router = new Router()
-  router.fallback((req) => req.redirect("/"))
+  router.fallback(makeIndexRoute({headStack:[]} as any as FlatRoute))
   pageRouter.routes.forEach((route) => {
     router.addRoute("GET", route.path, makeIndexRoute(route))
   })
@@ -183,6 +183,7 @@ if (typeof window !== 'undefined') {
   })
 
   router.addRoute("GET", "/peaque.js", async (req) => {
+    const pageRouter = await buildPageRouter(basePath)
     const mainFile = await generatePageRouterJS({ pageRouter, devMode: !noStrict, importPrefix: "./src", createReact: false })
     const fastifyContent = fastRefreshify(mainFile, "_page_router.tsx")
     const processedContents = makeImportsRelative(fastifyContent)
