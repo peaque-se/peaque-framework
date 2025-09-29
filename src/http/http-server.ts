@@ -3,6 +3,7 @@ import { WebSocket, WebSocketServer } from "ws"
 import { CookieJarImpl, PeaqueRequestImpl } from "./default-impl.js"
 import { parseRequestBody } from "./http-bodyparser.js"
 import { HttpMethod, PeaqueWebSocket, RequestHandler, WebSocketHandler } from "./http-types.js"
+import { InterruptFurtherProcessing } from "@peaque/framework"
 import { CustomHostNameNodeHandler } from "@peaque/framework/server/hostname-handlers"
 
 class DeferredPeaqueWebSocket implements PeaqueWebSocket {
@@ -185,8 +186,12 @@ export class HttpServer {
       try {
         await this.handler(peaqueReq)
       } catch (err) {
-        console.error("Error in request handler:", err)
-        peaqueReq.code(500).type("text/plain").send("500 - Internal Server Error")
+        if ((err instanceof InterruptFurtherProcessing) && peaqueReq.isResponded()) {
+            // Intended interruption of further processing - do nothing
+        } else {
+          console.error("Error in request handler:", err)
+          peaqueReq.code(500).type("text/plain").send("500 - Internal Server Error")
+        }
       }
 
       if (!peaqueReq.isResponded()) {

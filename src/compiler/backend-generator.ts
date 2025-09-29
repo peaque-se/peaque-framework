@@ -212,7 +212,7 @@ async function generateRouterForDirectory(
 /**
  * Interface for the generated backend program result
  */
-interface GeneratedBackendProgram {
+export interface GeneratedBackendProgram {
   content: string;
   routes: Array<{
     path: string;

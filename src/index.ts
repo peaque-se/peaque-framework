@@ -1,3 +1,5 @@
+import { InterruptFurtherProcessing } from './exceptions/index.js';
+
 // Main exports for the Peaque framework
 export {
   Router,
@@ -37,3 +39,7 @@ export type {
   CookieOptions,
   CookieJar,
 } from './http/http-types.js';
+
+export {
+  InterruptFurtherProcessing
+} from './exceptions/index.js';
