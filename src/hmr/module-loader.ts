@@ -90,7 +90,7 @@ export class ModuleLoader {
         write: true,
         outfile: outFile,
         absWorkingDir,
-        sourcemap: 'inline',
+        sourcemap: 'external',
         tsconfig: this.options.tsconfig,
         alias: { '@': aliasAt, 'react': 'react', 'react-dom': 'react-dom' },
         external: ['react', 'react-dom'],
@@ -113,7 +113,7 @@ export class ModuleLoader {
 
     const moduleHref = pathToFileURL(buildContext.outfile).href + `?v=${++ModuleLoader.importCounter}`
     const result = await import(moduleHref)
-    fs.unlinkSync(buildContext.outfile)
+    // fs.unlinkSync(buildContext.outfile)
     return result
   }
 

@@ -3,12 +3,12 @@ import { config } from "dotenv"
 import { accessSync, existsSync, promises as fs, readFileSync, statSync } from "fs"
 import path, { basename, extname } from "path"
 import colors from "yoctocolors"
-import "source-map-support/register.js"
 import { contentTypeRegistry } from "../assets/asset-handler.js"
 import { bundleModuleFromNodeModules, setBaseDependencies } from "../compiler/bundle.js"
 import { fastRefreshify } from "../compiler/fast-refreshify.js"
 import { makeImportsRelative, setupImportAliases } from "../compiler/imports.js"
 import { bundleCssFile } from "../compiler/tailwind-bundler.js"
+import { setupSourceMaps } from "../exceptions/sourcemaps.js"
 import { hmrConnectHandler, notifyConnectedClients } from "../hmr/hmr-handler.js"
 import { ModuleLoader } from "../hmr/module-loader.js"
 import { executeMiddlewareChain } from "../http/http-router.js"
@@ -105,6 +105,7 @@ export class DevServer {
     this.noStrict = noStrict
     this.server = new HttpServer((r) => this.handler(r))
     this.moduleLoader = new ModuleLoader({ absWorkingDir: basePath })
+    setupSourceMaps()
     this.jobsRunner = new JobsRunner(basePath)
 
     this.frontend = buildRouter(this.basePath + "/src/pages", pageRouterConfig)
@@ -153,7 +154,8 @@ export class DevServer {
       if (error.code === "EADDRINUSE") {
         console.error(`❌ Port ${this.port} is already in use. Please choose a different port or stop the process using it.`)
       } else {
-        console.error(`❌ Failed to start server:`, error.message)
+        console.error(`❌ Failed to start server.`)
+        console.error(error)
       }
       process.exit(1)
     }
