@@ -3,6 +3,7 @@ import { config } from "dotenv"
 import { accessSync, existsSync, promises as fs, readFileSync, statSync } from "fs"
 import path, { basename, extname } from "path"
 import colors from "yoctocolors"
+import "source-map-support/register.js"
 import { contentTypeRegistry } from "../assets/asset-handler.js"
 import { bundleModuleFromNodeModules, setBaseDependencies } from "../compiler/bundle.js"
 import { fastRefreshify } from "../compiler/fast-refreshify.js"
@@ -259,6 +260,7 @@ export class DevServer {
       return
     }
     const moduleFile = matchResult.names.handler
+    matchResult.params && Object.keys(matchResult.params).forEach((k) => req.setPathParam(k, matchResult.params[k]))
 
     const middlewares = await Promise.all(
       matchResult.stacks.middleware.map(

@@ -223,6 +223,152 @@ describe('Router - Comprehensive Tests', () => {
       expect(result?.names.page).toBe("/(auth)/login/page.tsx")
     })
 
+    test('should not match excluded routes when accessed directly with parentheses', () => {
+      const root: RouteNode = {
+        staticChildren: new Map([
+          ["(auth)", {
+            excludeFromPath: true,
+            staticChildren: new Map([
+              ["login", {
+                staticChildren: new Map(),
+                names: { page: "/(auth)/login/page.tsx" },
+                stacks: {},
+                accept: true
+              }]
+            ]),
+            names: {},
+            stacks: {},
+            accept: false
+          }]
+        ]),
+        names: { page: "/page.tsx" },
+        stacks: {},
+        accept: true
+      }
+
+      // Should not match when trying to access excluded route directly
+      const directAccess = match("/(auth)/login", root)
+      expect(directAccess).toBeNull()
+
+      // Should also not match just the excluded segment
+      const excludedOnly = match("/(auth)", root)
+      expect(excludedOnly).toBeNull()
+    })
+
+    test('should not match nested excluded routes with parentheses', () => {
+      const root: RouteNode = {
+        staticChildren: new Map([
+          ["(auth)", {
+            excludeFromPath: true,
+            staticChildren: new Map([
+              ["(modal)", {
+                excludeFromPath: true,
+                staticChildren: new Map([
+                  ["login", {
+                    staticChildren: new Map(),
+                    names: { page: "/(auth)/(modal)/login/page.tsx" },
+                    stacks: {},
+                    accept: true
+                  }]
+                ]),
+                names: {},
+                stacks: {},
+                accept: false
+              }]
+            ]),
+            names: {},
+            stacks: {},
+            accept: false
+          }]
+        ]),
+        names: { page: "/page.tsx" },
+        stacks: {},
+        accept: true
+      }
+
+      // Should match the correct path without parentheses
+      const correctPath = match("/login", root)
+      expect(correctPath?.pattern).toBe("/login")
+      expect(correctPath?.names.page).toBe("/(auth)/(modal)/login/page.tsx")
+
+      // Should not match with single excluded segment
+      const singleExcluded = match("/(auth)/login", root)
+      expect(singleExcluded).toBeNull()
+
+      // Should not match with nested excluded segments
+      const nestedExcluded = match("/(auth)/(modal)/login", root)
+      expect(nestedExcluded).toBeNull()
+
+      // Should not match partial excluded paths
+      const partialExcluded = match("/(modal)/login", root)
+      expect(partialExcluded).toBeNull()
+    })
+
+    test('should not match complex excluded route patterns', () => {
+      const root: RouteNode = {
+        staticChildren: new Map([
+          ["(dashboard)", {
+            excludeFromPath: true,
+            staticChildren: new Map([
+              ["users", {
+                staticChildren: new Map(),
+                paramChild: {
+                  paramName: "id",
+                  staticChildren: new Map([
+                    ["settings", {
+                      staticChildren: new Map(),
+                      names: { page: "/(dashboard)/users/[id]/settings/page.tsx" },
+                      stacks: {},
+                      accept: true
+                    }]
+                  ]),
+                  names: { page: "/(dashboard)/users/[id]/page.tsx" },
+                  stacks: {},
+                  accept: true
+                },
+                names: { page: "/(dashboard)/users/page.tsx" },
+                stacks: {},
+                accept: true
+              }]
+            ]),
+            names: {},
+            stacks: {},
+            accept: false
+          }]
+        ]),
+        names: { page: "/page.tsx" },
+        stacks: {},
+        accept: true
+      }
+
+      // Should match correct paths without parentheses
+      const usersList = match("/users", root)
+      expect(usersList?.pattern).toBe("/users")
+      expect(usersList?.names.page).toBe("/(dashboard)/users/page.tsx")
+
+      const userDetail = match("/users/123", root)
+      expect(userDetail?.pattern).toBe("/users/:id")
+      expect(userDetail?.params).toEqual({ id: "123" })
+
+      const userSettings = match("/users/123/settings", root)
+      expect(userSettings?.pattern).toBe("/users/:id/settings")
+      expect(userSettings?.params).toEqual({ id: "123" })
+
+      // Should not match any paths with parentheses
+      const excludedUsers = match("/(dashboard)/users", root)
+      expect(excludedUsers).toBeNull()
+
+      const excludedUserDetail = match("/(dashboard)/users/123", root)
+      expect(excludedUserDetail).toBeNull()
+
+      const excludedUserSettings = match("/(dashboard)/users/123/settings", root)
+      expect(excludedUserSettings).toBeNull()
+
+      // Should not match partial excluded paths
+      const partialExcluded = match("/users/(dashboard)/123", root)
+      expect(partialExcluded).toBeNull()
+    })
+
     test('should aggregate names and stacks from parent nodes', () => {
       const root: RouteNode = {
         staticChildren: new Map([

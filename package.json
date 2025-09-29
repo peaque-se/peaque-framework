@@ -1,6 +1,6 @@
 {
   "name": "@peaque/framework",
-  "version": "2.2.0",
+  "version": "2.2.1",
   "description": "The last javascript framework ever to be needed",
   "type": "module",
   "license": "MIT",
@@ -53,6 +53,7 @@
     "glob": "^10.3.0",
     "mime-types": "^2.1.0",
     "postcss": "^8.4.0",
+    "source-map-support": "^0.5.21",
     "ws": "^8.14.0",
     "yoctocolors": "^2.1.2"
   },
