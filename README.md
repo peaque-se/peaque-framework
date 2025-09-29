@@ -1,10 +1,5 @@
-# Peaque Framew### File-Based Routing
-- **Pages**: Create routes with `src/pages/**/page.tsx` files
-- **API Routes**: Build APIs with `src/api/**/route.ts` files using HTTP method exports
-- **Layouts**: Wrap pages with `src/pages/**/layout.tsx` files for shared UI
-- **Route Guards**: Protect routes with `src/pages/**/guard.ts` files
-- **Dynamic Routes**: Use `[param]` folders for parameterized routes
-- **Grouped Routes**: Use `(group)` folders for organization (ignored in routing)
+# Peaque Framework
+
 > The last JavaScript framework ever to be needed
 
 Peaque is a modern, full-stack TypeScript web framework that combines file-based routing with React, built-in Tailwind CSS, and advanced Hot Module Replacement (HMR). Built from the ground up for developer productivity with zero configuration.
