@@ -52,9 +52,9 @@ export class JobsRunner {
 
       const cronerJobs: Cron[] = []
       for (const schedule of module.schedule) {
-        console.log(`🕵️   Scheduling job from ${colors.green(jobName)} with schedule: ${colors.gray(schedule)}`)
+        console.log(`     ${colors.green("✓")} 📅 Scheduling job from ${colors.green(jobName)} with schedule: ${colors.gray(schedule)}`)
         const job = new Cron(schedule, { protect: true }, () => {
-          console.log(`⏰  Starting job from ${colors.green(jobName)} with schedule: ${colors.gray(schedule)} at ${new Date().toLocaleString()}`)
+          console.log(`     ${colors.green("✓")} 🛎️ Starting job from ${colors.green(jobName)} with schedule: ${colors.gray(schedule)} at ${new Date().toLocaleString()}`)
           try {
             module.runJob()
           } catch (error) {

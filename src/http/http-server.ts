@@ -133,7 +133,6 @@ export class HttpServer {
 
   async startServer(port: number): Promise<void> {
     this.server = http.createServer(async (req: http.IncomingMessage, res: http.ServerResponse) => {
-
       const hostHandler = CustomHostNameNodeHandler[req.headers.host || ""]
       if (hostHandler) {
         return await hostHandler(req, res)
@@ -186,8 +185,8 @@ export class HttpServer {
       try {
         await this.handler(peaqueReq)
       } catch (err) {
-        if ((err instanceof InterruptFurtherProcessing) && peaqueReq.isResponded()) {
-            // Intended interruption of further processing - do nothing
+        if (peaqueReq.isResponded() && (err instanceof InterruptFurtherProcessing || (err && typeof err === "object" && (err as any).type === "@peaque/framework/InterruptFurtherProcessing"))) {
+          // Intended interruption of further processing - do nothing
         } else {
           console.error("Error in request handler:", err)
           peaqueReq.code(500).type("text/plain").send("500 - Internal Server Error")
@@ -236,7 +235,7 @@ export class HttpServer {
 
     return new Promise((resolve, reject) => {
       this.server!.listen(port, () => resolve())
-      this.server!.on('error', reject)
+      this.server!.on("error", reject)
     })
   }
 
@@ -245,4 +244,3 @@ export class HttpServer {
     this.server?.close()
   }
 }
-

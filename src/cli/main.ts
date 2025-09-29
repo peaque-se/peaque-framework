@@ -5,6 +5,7 @@ import { buildForProduction } from "./prod-builder.js"
 import path from "path"
 import fs from "fs"
 import { runFastRefreshServer } from "./fast-refresh-server.js"
+import { DevServer } from "../server/dev-server.js"
 
 const command = process.argv[2]
 const args = process.argv.slice(3)
@@ -35,7 +36,14 @@ function showHelp() {
 
 async function main() {
   if (command === "dev" || command === "hmr") {
-    await runFastRefreshServer(basePath, port, noStrict)
+    //await runFastRefreshServer(basePath, port, noStrict)
+    const devServer = new DevServer(basePath, port, noStrict);
+    await devServer.start();
+    process.on('SIGINT', () => {
+      devServer.stop("SIGINT").then(() => {
+        process.exit(0);
+      });
+    });
   } else if (command === "build") {
     await buildForProduction(basePath)
     process.exit(0)

@@ -5,7 +5,7 @@ import { Router } from "../http/http-router.js"
 import { promises as fs } from "fs"
 import { join, extname, basename } from "path"
 
-const contentTypeRegistry: Record<string, string> = {
+export const contentTypeRegistry: Record<string, string> = {
   ".js": "application/javascript",
   ".mjs": "application/javascript",
   ".css": "text/css",

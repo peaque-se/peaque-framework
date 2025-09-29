@@ -1,5 +1,10 @@
-# Peaque Framework
-
+# Peaque Framew### File-Based Routing
+- **Pages**: Create routes with `src/pages/**/page.tsx` files
+- **API Routes**: Build APIs with `src/api/**/route.ts` files using HTTP method exports
+- **Layouts**: Wrap pages with `src/pages/**/layout.tsx` files for shared UI
+- **Route Guards**: Protect routes with `src/pages/**/guard.ts` files
+- **Dynamic Routes**: Use `[param]` folders for parameterized routes
+- **Grouped Routes**: Use `(group)` folders for organization (ignored in routing)
 > The last JavaScript framework ever to be needed
 
 Peaque is a modern, full-stack TypeScript web framework that combines file-based routing with React, built-in Tailwind CSS, and advanced Hot Module Replacement (HMR). Built from the ground up for developer productivity with zero configuration.
@@ -66,6 +71,11 @@ my-app/
 │   │   ├── page.tsx              # Home page (/)
 │   │   ├── about/
 │   │   │   └── page.tsx          # About page (/about)
+│   │   ├── (auth)/               # Group folder (ignored in routing)
+│   │   │   ├── login/
+│   │   │   │   └── page.tsx      # Login page (/login)
+│   │   │   └── register/
+│   │   │       └── page.tsx      # Register page (/register)
 │   │   ├── blog/
 │   │   │   ├── layout.tsx        # Blog layout
 │   │   │   ├── page.tsx          # Blog index (/blog)
@@ -154,6 +164,32 @@ export default function BlogPostPage() {
       <h1>Blog Post: {slug}</h1>
       <p>Content for {slug}...</p>
     </article>
+  );
+}
+```
+
+### Grouped Routes
+
+Use parentheses for organizational grouping that doesn't affect the URL structure:
+
+```typescript
+// src/pages/(auth)/login/page.tsx - Route: /login
+export default function LoginPage() {
+  return (
+    <div className="login-form">
+      <h1>Login</h1>
+      {/* Login form */}
+    </div>
+  );
+}
+
+// src/pages/(auth)/register/page.tsx - Route: /register
+export default function RegisterPage() {
+  return (
+    <div className="register-form">
+      <h1>Register</h1>
+      {/* Registration form */}
+    </div>
   );
 }
 ```

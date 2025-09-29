@@ -1,26 +1,16 @@
 import { createContext, useContext, useEffect, useState, Component, useCallback } from "react"
 import type { ReactElement, ReactNode } from "react"
 import type { HeadDefinition } from "./head.js"
+import { match, RouteNode } from "../router/router.js"
 
 export type GuardResult = boolean | string | Promise<boolean | string>
 export type GuardParameters = { path: string; params: Record<string, string>; pattern: string }
 export type PageGuard = (params: GuardParameters) => GuardResult
 export type PageMiddleware = (params: GuardParameters) => GuardResult
 
-export type Route = {
-  path?: string
-  param?: string
-  page?: React.ComponentType<any>
-  layout?: React.ComponentType<any>
-  children?: Route[]
-  guard?: PageGuard
-  middleware?: PageMiddleware
-  head?: HeadDefinition
-  prefixLinks?: boolean
-}
 
 export type RouterProps = {
-  root: Route
+  root: RouteNode
   loading?: ReactNode
   missing?: ReactNode
   error?: ReactNode
@@ -121,89 +111,19 @@ type MatchResult = {
   heads: HeadDefinition[]
 }
 
-export function findMatch(root: Route, path: string): MatchResult | null {
-  const layoutStack: React.ComponentType<any>[] = [...(root.layout ? [root.layout] : [])]
-  const guardStack: PageGuard[] = [...(root.guard ? [root.guard] : [])]
-  const headStack: HeadDefinition[] = [...(root.head ? [root.head] : [])]
-  let pattern = ""
-
-  // divide the path into segments and traverse the route tree, one segment at a time until we find a match or exhaust the tree
-  // nodes in the tree can have a path (static segment) or param (dynamic segment)
-  // at each segment, we look for a matching child route (static first, then dynamic)
-  // if we find a match, we push its layout and guard onto the stack (if any) and continue to the next segment
-  // if we don't find a match, we stop and return null
-  // if we exhaust all segments and are at a route with a component, we have a match
-  const segments = path === "/" ? [] : path.split("/").filter(Boolean)
-  let currentRoutes: Route[] = root.children || []
-  let params: Record<string, string> = {}
-
-  let matchedRoute: Route | null = null
-  for (const segment of segments) {
-    matchedRoute = null
-
-    // First, try to find a path route that matches
-    for (const route of currentRoutes) {
-      if (route.path === segment) {
-        pattern += `/${route.path}`
-        matchedRoute = route
-        break
-      }
-    }
-
-    // If no path route matched, try param routes
-    if (!matchedRoute) {
-      for (const route of currentRoutes) {
-        if (route.param) {
-          params[route.param] = segment
-          pattern += `/:${route.param}`
-          matchedRoute = route
-          break
-        }
-      }
-    }
-
-    if (!matchedRoute) {
-      return null
-    }
-
-    if (matchedRoute.layout) layoutStack.push(matchedRoute.layout)
-    if (matchedRoute.guard) guardStack.push(matchedRoute.guard)
-    if (matchedRoute.head) headStack.push(matchedRoute.head)
-
-    currentRoutes = matchedRoute.children || []
+export function findMatch(root: RouteNode, path: string): MatchResult | null {
+  const m = match(path, root)
+  if (!m) return null
+  const result : MatchResult = {
+    component: m.names.page,
+    pattern: m.pattern,
+    layouts: m.stacks.layout || [],
+    params: m.params,
+    guards: m.stacks.guards || [],
+    middleware: m.stacks.middleware || [],
+    heads: m.stacks.heads || [],
   }
-
-  // Collect middleware only from the final matched route (non-stackable)
-  const middlewareStack: PageMiddleware[] = []
-  if (matchedRoute?.middleware) {
-    middlewareStack.push(matchedRoute.middleware)
-  }
-
-  // After processing all segments, check if we have a matching route with a component
-  if (matchedRoute && matchedRoute.page) {
-    return {
-      component: matchedRoute.page,
-      pattern: pattern || "/",
-      layouts: layoutStack,
-      params,
-      guards: guardStack,
-      middleware: middlewareStack,
-      heads: headStack,
-    }
-  }
-  // Special case for root path "/"
-  if (segments.length === 0 && root.page) {
-    return {
-      component: root.page,
-      pattern: "/",
-      layouts: layoutStack,
-      params: {},
-      guards: guardStack,
-      middleware: root.middleware ? [root.middleware] : [],
-      heads: headStack,
-    }
-  }
-  return null
+  return result
 }
 
 export function navigate(path: string) {

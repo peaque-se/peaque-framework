@@ -71,7 +71,7 @@ export class ModuleLoader {
 
   private async compileAndImport(modulePath: string): Promise<any> {
     const absWorkingDir = this.options.absWorkingDir ?? process.cwd()
-    const cacheDir = this.options.cacheDir ?? path.join(absWorkingDir, '.peaque', 'bundles')
+    const cacheDir = this.options.cacheDir ?? path.join(absWorkingDir, '.peaque', 'temp')
     const aliasAt = this.options.aliasAt ?? path.join(absWorkingDir, 'src')
 
     const rawPath = modulePath.split('?')[0]
@@ -112,7 +112,9 @@ export class ModuleLoader {
     }
 
     const moduleHref = pathToFileURL(buildContext.outfile).href + `?v=${++ModuleLoader.importCounter}`
-    return import(moduleHref)
+    const result = await import(moduleHref)
+    fs.unlinkSync(buildContext.outfile)
+    return result
   }
 
   private toFilePath(raw: string): string {

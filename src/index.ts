@@ -16,7 +16,6 @@ export {
 } from './client/client-router.js';
 
 export type {
-  Route,
   RouterProps,
   PageGuard,
   PageMiddleware,
@@ -43,3 +42,7 @@ export type {
 export {
   InterruptFurtherProcessing
 } from './exceptions/index.js';
+
+export type {
+  RouteNode
+} from './router/router.js';

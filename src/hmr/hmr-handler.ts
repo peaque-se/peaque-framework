@@ -43,6 +43,6 @@ export function notifyConnectedClients(data: any = {}, reason = "application") {
         connectedClients.delete(ws)
       }
     })
-    console.log(`📡 Updated ${colors.gray(reason)} (${connectedClients.size} client${connectedClients.size === 1 ? "" : "s"})`)
+    //console.log(`📡 Updated ${colors.gray(reason)} (${connectedClients.size} client${connectedClients.size === 1 ? "" : "s"})`)
   }
 }

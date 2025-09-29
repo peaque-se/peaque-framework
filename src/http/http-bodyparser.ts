@@ -4,6 +4,7 @@ import { URLSearchParams } from 'url';
 export interface ParsedBodyResult {
   body: any;
   updatedQueryParams: Record<string, string | string[]>;
+  failed?: boolean;
 }
 
 /**
@@ -73,10 +74,11 @@ export async function parseRequestBody(req: IncomingMessage, existingQueryParams
     }
   } catch (error) {
     // If parsing fails, return raw body as fallback
-    console.warn('Failed to parse request body:', error);
+    //console.warn('Failed to parse request body:', error);
     return {
       body: null,
-      updatedQueryParams: { ...existingQueryParams }
+      updatedQueryParams: { ...existingQueryParams },
+      failed: true
     };
   }
 }
