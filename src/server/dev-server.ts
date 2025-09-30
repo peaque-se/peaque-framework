@@ -84,6 +84,29 @@ function componentify(router: RouteNode, baseDir: string): Set<string> {
   return imports
 }
 
+function checkSpecialPage(pagesDir: string, fileName: string): string | null {
+  const filePath = path.join(pagesDir, fileName)
+  if (existsSync(filePath)) {
+    const relativePath = path.relative(pagesDir, filePath).replace(/\\/g, "/")
+    let componentName: string
+    if (fileName === "loading.tsx") componentName = "Loading"
+    else if (fileName === "404.tsx") componentName = "Missing"
+    else if (fileName === "error.tsx") componentName = "Error"
+    else if (fileName === "403.tsx") componentName = "AccessDenied"
+    else componentName = relativePath.replace(/[^a-zA-Z0-9]/g, "_").replace(/^_+|_+$/g, "")
+    return componentName
+  }
+  return null
+}
+
+function safeBuildRouter(dirPath: string, config: RouteFileConfig[]): RouteNode {
+  if (existsSync(dirPath)) {
+    return buildRouter(dirPath, config)
+  }
+  // Return empty router if directory doesn't exist
+  return { staticChildren: new Map(), names: {}, stacks: {}, accept: false }
+}
+
 /// fifteenth attempt at a dev server that reloads even better, but is still fast
 export class DevServer {
   private basePath: string
@@ -98,6 +121,10 @@ export class DevServer {
   private jobsRunner: JobsRunner
   private watcher: chokidar.FSWatcher | undefined
   private handler: RequestHandler = this.requestHandler.bind(this)
+  private loadingPage: string | null = null
+  private missingPage: string | null = null
+  private errorPage: string | null = null
+  private accessDeniedPage: string | null = null
 
   constructor(basePath: string, port: number, noStrict: boolean) {
     this.basePath = basePath
@@ -108,9 +135,18 @@ export class DevServer {
     setupSourceMaps()
     this.jobsRunner = new JobsRunner(basePath)
 
-    this.frontend = buildRouter(this.basePath + "/src/pages", pageRouterConfig)
+    this.frontend = safeBuildRouter(this.basePath + "/src/pages", pageRouterConfig)
     this.frontendImports = componentify(this.frontend, this.basePath + "/src/pages")
-    this.backend = buildRouter(this.basePath + "/src/api", apiRouterConfig)
+    this.backend = safeBuildRouter(this.basePath + "/src/api", apiRouterConfig)
+
+    // Check for special pages
+    const pagesDir = this.basePath + "/src/pages"
+    if (existsSync(pagesDir)) {
+      this.loadingPage = checkSpecialPage(pagesDir, "loading.tsx")
+      this.missingPage = checkSpecialPage(pagesDir, "404.tsx")
+      this.errorPage = checkSpecialPage(pagesDir, "error.tsx")
+      this.accessDeniedPage = checkSpecialPage(pagesDir, "403.tsx")
+    }
 
     const tsconfigPath = path.join(basePath, "tsconfig.json")
     if (existsSync(tsconfigPath)) {
@@ -232,6 +268,10 @@ export class DevServer {
 
   private watchSourceFiles() {
     const srcDir = this.basePath + "/src"
+    // Only watch if src directory exists
+    if (!existsSync(srcDir)) {
+      return
+    }
     // watch the src directory recursively for changes to .ts, .tsx, .js, .jsx files with chokidar
     this.watcher = chokidar.watch(srcDir, {
       cwd: this.basePath,
@@ -245,11 +285,24 @@ export class DevServer {
         notifyConnectedClients({ event, path: path.replace(".tsx", "") }, path)
       } else {
         if (path.startsWith("src/pages/")) {
-          this.frontend = buildRouter(this.basePath + "/src/pages", pageRouterConfig)
+          this.frontend = safeBuildRouter(this.basePath + "/src/pages", pageRouterConfig)
           this.frontendImports = componentify(this.frontend, this.basePath + "/src/pages")
+          // Re-check special pages when pages directory changes
+          const pagesDir = this.basePath + "/src/pages"
+          if (existsSync(pagesDir)) {
+            this.loadingPage = checkSpecialPage(pagesDir, "loading.tsx")
+            this.missingPage = checkSpecialPage(pagesDir, "404.tsx")
+            this.errorPage = checkSpecialPage(pagesDir, "error.tsx")
+            this.accessDeniedPage = checkSpecialPage(pagesDir, "403.tsx")
+          } else {
+            this.loadingPage = null
+            this.missingPage = null
+            this.errorPage = null
+            this.accessDeniedPage = null
+          }
           notifyConnectedClients({ event, path: "/peaque.js" }, "<main router>")
         } else if (path.startsWith("src/api/")) {
-          this.backend = buildRouter(this.basePath + "/src/api", apiRouterConfig)
+          this.backend = safeBuildRouter(this.basePath + "/src/api", apiRouterConfig)
         } else if (path.startsWith("src/jobs/")) {
           this.jobsRunner.startOrUpdateJobs()
         }
@@ -266,7 +319,7 @@ export class DevServer {
     const moduleFile = matchResult.names.handler
     matchResult.params && Object.keys(matchResult.params).forEach((k) => req.setPathParam(k, matchResult.params[k]))
 
-    const middlewares = await Promise.all(
+    const middlewares = matchResult.stacks.middleware ? await Promise.all(
       matchResult.stacks.middleware.map(
         async (middlewareFile) =>
           await this.moduleCache.cacheByHash(middlewareFile, async () => {
@@ -274,7 +327,7 @@ export class DevServer {
             return await this.moduleLoader.loadExport(module, "middleware")
           })
       )
-    )
+    ) : []
 
     const api = await this.moduleCache.cacheByHash(moduleFile, async () => {
       const module = path.relative(this.basePath, moduleFile).replace(/\\/g, "/")
@@ -320,9 +373,39 @@ export class DevServer {
     }
     result.push(`import { Router } from "@peaque/framework"`)
     result.push(...Array.from(this.frontendImports))
+
+    // Add imports for special pages
+    if (this.loadingPage) {
+      result.push(`import ${this.loadingPage} from "./src/pages/loading.tsx";`)
+    }
+    if (this.missingPage) {
+      result.push(`import ${this.missingPage} from "./src/pages/404.tsx";`)
+    }
+    if (this.errorPage) {
+      result.push(`import ${this.errorPage} from "./src/pages/error.tsx";`)
+    }
+    if (this.accessDeniedPage) {
+      result.push(`import ${this.accessDeniedPage} from "./src/pages/403.tsx";`)
+    }
+
     result.push(serializeRouterToJs(this.frontend, true))
     result.push(`const conf = {`)
     result.push(`  root: router,`)
+
+    // Add special page props to configuration
+    if (this.loadingPage) {
+      result.push(`  loading: <${this.loadingPage} />,`)
+    }
+    if (this.missingPage) {
+      result.push(`  missing: <${this.missingPage} />,`)
+    }
+    if (this.errorPage) {
+      result.push(`  error: <${this.errorPage} />,`)
+    }
+    if (this.accessDeniedPage) {
+      result.push(`  accessDenied: <${this.accessDeniedPage} />,`)
+    }
+
     result.push(`}`)
     result.push(`export default function() {`)
     if (this.noStrict) {
@@ -429,7 +512,11 @@ if (typeof window !== 'undefined') {
   }
 
   private async servePeaqueCss(req: PeaqueRequest) {
-    const css = readFileSync(this.basePath + "/src/styles.css", "utf-8")
+    const stylesPath = this.basePath + "/src/styles.css"
+    let css = ""
+    if (existsSync(stylesPath)) {
+      css = readFileSync(stylesPath, "utf-8")
+    }
     const bundle = await bundleCssFile(css, this.basePath)
     req.code(200).header("Content-Type", "text/css").send(bundle)
   }
