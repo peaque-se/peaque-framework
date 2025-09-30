@@ -80,6 +80,7 @@ export class CookieJarImpl implements CookieJar {
 // implementation that keeps all data in memory (copied from a http request implementation)
 export class PeaqueRequestImpl implements PeaqueRequest {
   private requestBodyData: any;
+  private rawBodyData?: Buffer;
   private paramsData: Record<string, string>;
   private queryData: Record<string, string | string[]>;
   private requestHeadersData: Record<string, string | string[]>;
@@ -105,8 +106,10 @@ export class PeaqueRequestImpl implements PeaqueRequest {
     originalUrlData: string,
     ipData: string,
     cookieHeader: string | undefined,
+    rawBodyData?: Buffer,
   ) {
     this.requestBodyData = bodyData;
+    this.rawBodyData = rawBodyData;
     this.paramsData = paramsData;
     this.queryData = queryData;
     this.requestHeadersData = headersData;
@@ -119,6 +122,9 @@ export class PeaqueRequestImpl implements PeaqueRequest {
 
   body<T = any>(): T {
     return this.requestBodyData as T;
+  }
+  rawBody(): Buffer | undefined {
+    return this.rawBodyData;
   }
   param(name: string): string | undefined {
     return this.paramsData[name] || this.queryParam(name);

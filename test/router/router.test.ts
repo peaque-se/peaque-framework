@@ -223,6 +223,120 @@ describe('Router - Comprehensive Tests', () => {
       expect(result?.names.page).toBe("/(auth)/login/page.tsx")
     })
 
+    test('should not leak names from failed excluded routes', () => {
+      const root: RouteNode = {
+        staticChildren: new Map([
+          ["(auth)", {
+            excludeFromPath: true,
+            staticChildren: new Map([
+              ["login", {
+                staticChildren: new Map(),
+                names: { page: "/(auth)/login/page.tsx" },
+                stacks: {},
+                accept: true
+              }]
+            ]),
+            names: { layout: "/(auth)/layout.tsx" },
+            stacks: {},
+            accept: false
+          }],
+          ["(admin)", {
+            excludeFromPath: true,
+            staticChildren: new Map(),
+            names: { page: "/(admin)/page.tsx" },
+            stacks: {},
+            accept: true
+          }]
+        ]),
+        names: {},
+        stacks: {},
+        accept: false
+      }
+
+      // Matching "/" should try excluded routes
+      // First tries (auth), which doesn't accept and has names/layout
+      // Then tries (admin), which accepts and has page
+      // Should not include layout from failed (auth) route
+      const result = match("/", root)
+      expect(result?.pattern).toBe("/")
+      expect(result?.names).toEqual({ page: "/(admin)/page.tsx" })
+      expect(result?.stacks).toEqual({})
+    })
+
+    test('should not leak stacks from failed excluded routes', () => {
+      const root: RouteNode = {
+        staticChildren: new Map([
+          ["(auth)", {
+            excludeFromPath: true,
+            staticChildren: new Map([
+              ["login", {
+                staticChildren: new Map(),
+                names: { page: "/(auth)/login/page.tsx" },
+                stacks: {},
+                accept: true
+              }]
+            ]),
+            names: {},
+            stacks: { guards: ["/(auth)/guard.ts"] },
+            accept: false
+          }],
+          ["(admin)", {
+            excludeFromPath: true,
+            staticChildren: new Map(),
+            names: { page: "/(admin)/page.tsx" },
+            stacks: { middleware: ["/(admin)/middleware.ts"] },
+            accept: true
+          }]
+        ]),
+        names: {},
+        stacks: {},
+        accept: false
+      }
+
+      // Matching "/" should try excluded routes
+      // First tries (auth), which doesn't accept and has guards stack
+      // Then tries (admin), which accepts and has middleware stack
+      // Should not include guards from failed (auth) route
+      const result = match("/", root)
+      expect(result?.pattern).toBe("/")
+      expect(result?.names).toEqual({ page: "/(admin)/page.tsx" })
+      expect(result?.stacks).toEqual({ middleware: ["/(admin)/middleware.ts"] })
+    })
+
+    test('should not leak names and stacks from failed param routes', () => {
+      const root: RouteNode = {
+        staticChildren: new Map(),
+        paramChild: {
+          paramName: "id",
+          staticChildren: new Map(),
+          names: { layout: "/[id]/layout.tsx" },
+          stacks: { guards: ["/[id]/guard.ts"] },
+          accept: false
+        },
+        wildcardChild: {
+          paramName: "path",
+          optional: false,
+          staticChildren: new Map(),
+          names: { page: "/[...path]/page.tsx" },
+          stacks: {},
+          accept: true
+        },
+        names: {},
+        stacks: {},
+        accept: false
+      }
+
+      // Matching "/someId" should try param first
+      // Param collects names/stacks but doesn't accept
+      // Then tries wildcard, which accepts
+      // Should not include layout/guards from failed param route
+      const result = match("/someId", root)
+      expect(result?.pattern).toBe("/*path")
+      expect(result?.params).toEqual({ path: "someId" })
+      expect(result?.names).toEqual({ page: "/[...path]/page.tsx" })
+      expect(result?.stacks).toEqual({})
+    })
+
     test('should not match excluded routes when accessed directly with parentheses', () => {
       const root: RouteNode = {
         staticChildren: new Map([
@@ -917,6 +1031,107 @@ describe('Router - Comprehensive Tests', () => {
       // Test layout inheritance
       const dashboardMatch = match("/dashboard", router)
       expect(dashboardMatch?.stacks.layout).toEqual(["/app/layout.tsx", "/app/dashboard/layout.tsx"])
+    })
+
+    test('should handle multiple route groups at root level', () => {
+      // Test the user's specific structure with multiple route groups
+      mockFs.addDirectory("/app", [
+        { name: "(private)", isDirectory: true, isFile: false, path: "/app/(private)" },
+        { name: "(public)", isDirectory: true, isFile: false, path: "/app/(public)" },
+        { name: "head.ts", isFile: true, isDirectory: false, path: "/app/head.ts" }
+      ])
+
+      mockFs.addDirectory("/app/(private)", [
+        { name: "dashboard", isDirectory: true, isFile: false, path: "/app/(private)/dashboard" }
+      ])
+
+      mockFs.addDirectory("/app/(private)/dashboard", [
+        { name: "page.tsx", isFile: true, isDirectory: false, path: "/app/(private)/dashboard/page.tsx" }
+      ])
+
+      mockFs.addDirectory("/app/(public)", [
+        { name: "page.tsx", isFile: true, isDirectory: false, path: "/app/(public)/page.tsx" },
+        { name: "about", isDirectory: true, isFile: false, path: "/app/(public)/about" }
+      ])
+
+      mockFs.addDirectory("/app/(public)/about", [
+        { name: "page.tsx", isFile: true, isDirectory: false, path: "/app/(public)/about/page.tsx" }
+      ])
+
+      // Custom config that includes head.ts as a stacking file
+      const customConfig = [
+        ...defaultConfig,
+        { pattern: "head.ts", property: "head", stacks: true, accept: false }
+      ]
+
+      const router = buildRouter("/app", customConfig, mockFs)
+
+      // Verify that head.ts is included as a stacking file
+      expect(router.stacks.head).toEqual(["/app/head.ts"])
+
+      // Test that / matches the public route
+      const rootMatch = match("/", router)
+      expect(rootMatch?.pattern).toBe("/")
+      expect(rootMatch?.names.page).toBe("/app/(public)/page.tsx")
+      expect(rootMatch?.stacks.head).toEqual(["/app/head.ts"])
+
+      // Test that /about matches the public about route
+      const aboutMatch = match("/about", router)
+      expect(aboutMatch?.pattern).toBe("/about")
+      expect(aboutMatch?.names.page).toBe("/app/(public)/about/page.tsx")
+
+      // Test that /dashboard matches the private dashboard route
+      const dashboardMatch = match("/dashboard", router)
+      expect(dashboardMatch?.pattern).toBe("/dashboard")
+      expect(dashboardMatch?.names.page).toBe("/app/(private)/dashboard/page.tsx")
+    })
+
+    test('should handle route groups with root layout inheritance', () => {
+      // Set up directory structure with route groups and root layout
+      mockFs.addDirectory("/app", [
+        { name: "layout.tsx", isFile: true, isDirectory: false, path: "/app/layout.tsx" },
+        { name: "(private)", isDirectory: true, isFile: false, path: "/app/(private)" },
+        { name: "(public)", isDirectory: true, isFile: false, path: "/app/(public)" }
+      ])
+
+      mockFs.addDirectory("/app/(private)", [
+        { name: "layout.tsx", isFile: true, isDirectory: false, path: "/app/(private)/layout.tsx" },
+        { name: "dashboard", isDirectory: true, isFile: false, path: "/app/(private)/dashboard" }
+      ])
+
+      mockFs.addDirectory("/app/(private)/dashboard", [
+        { name: "page.tsx", isFile: true, isDirectory: false, path: "/app/(private)/dashboard/page.tsx" }
+      ])
+
+      mockFs.addDirectory("/app/(public)", [
+        { name: "layout.tsx", isFile: true, isDirectory: false, path: "/app/(public)/layout.tsx" },
+        { name: "page.tsx", isFile: true, isDirectory: false, path: "/app/(public)/page.tsx" },
+        { name: "about", isDirectory: true, isFile: false, path: "/app/(public)/about" }
+      ])
+
+      mockFs.addDirectory("/app/(public)/about", [
+        { name: "page.tsx", isFile: true, isDirectory: false, path: "/app/(public)/about/page.tsx" }
+      ])
+
+      const router = buildRouter("/app", defaultConfig, mockFs)
+
+      // Test /dashboard route
+      const dashboardMatch = match("/dashboard", router)
+      expect(dashboardMatch?.pattern).toBe("/dashboard")
+      expect(dashboardMatch?.names.page).toBe("/app/(private)/dashboard/page.tsx")
+      expect(dashboardMatch?.stacks.layout).toEqual(["/app/layout.tsx", "/app/(private)/layout.tsx"])
+
+      // Test / route
+      const rootMatch = match("/", router)
+      expect(rootMatch?.pattern).toBe("/")
+      expect(rootMatch?.names.page).toBe("/app/(public)/page.tsx")
+      expect(rootMatch?.stacks.layout).toEqual(["/app/layout.tsx", "/app/(public)/layout.tsx"])
+
+      // Test /about route
+      const aboutMatch = match("/about", router)
+      expect(aboutMatch?.pattern).toBe("/about")
+      expect(aboutMatch?.names.page).toBe("/app/(public)/about/page.tsx")
+      expect(aboutMatch?.stacks.layout).toEqual(["/app/layout.tsx", "/app/(public)/layout.tsx"])
     })
   })
 

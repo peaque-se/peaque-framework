@@ -3,6 +3,7 @@ import { URLSearchParams } from 'url';
 
 export interface ParsedBodyResult {
   body: any;
+  rawBody?: Buffer;
   updatedQueryParams: Record<string, string | string[]>;
   failed?: boolean;
 }
@@ -39,6 +40,7 @@ export async function parseRequestBody(req: IncomingMessage, existingQueryParams
       const parsedBody = jsonString ? JSON.parse(jsonString) : null;
       return {
         body: parsedBody,
+        rawBody, // Preserve raw body for webhook validation
         updatedQueryParams: { ...existingQueryParams }
       };
     } else if (contentType.includes('application/x-www-form-urlencoded')) {
@@ -63,12 +65,14 @@ export async function parseRequestBody(req: IncomingMessage, existingQueryParams
 
       return {
         body: null, // Form data doesn't typically have a separate body
+        rawBody, // Preserve raw body
         updatedQueryParams
       };
     } else {
       // Binary or other content types - return as Buffer
       return {
         body: rawBody,
+        rawBody, // Preserve raw body
         updatedQueryParams: { ...existingQueryParams }
       };
     }

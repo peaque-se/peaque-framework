@@ -15,8 +15,11 @@ export function serializeRouterToJs(root: RouteNode, namesAndStacksAreComponentN
     }
     if (node.staticChildren.size > 0) {
       parts.push(`\n${childIndent}staticChildren: new Map([`)
+      let excludedIndex = 0
       for (const [key, child] of node.staticChildren) {
-        parts.push(`\n${childIndent}  ["${key}", ${serializeNode(child, childIndent + "  ")}],`)
+        // Redact keys for excluded directories
+        const serializedKey = child.excludeFromPath ? `"__excluded_${excludedIndex++}__"` : `"${key}"`
+        parts.push(`\n${childIndent}  [${serializedKey}, ${serializeNode(child, childIndent + "  ")}],`)
       }
       parts.push(`\n${childIndent}]),`)
     }

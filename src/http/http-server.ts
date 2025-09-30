@@ -55,8 +55,8 @@ class PeaqueRequestImplWithWebSocket extends PeaqueRequestImpl {
   private rawResponse?: http.ServerResponse
   private server?: HttpServer
 
-  constructor(bodyData: any, paramsData: Record<string, string>, queryData: Record<string, string | string[]>, headersData: Record<string, string | string[]>, methodData: HttpMethod, pathData: string, originalUrlData: string, ipData: string, cookieHeader: string | undefined, rawRequest?: http.IncomingMessage, rawResponse?: http.ServerResponse, server?: HttpServer) {
-    super(bodyData, paramsData, queryData, headersData, methodData, pathData, originalUrlData, ipData, cookieHeader)
+  constructor(bodyData: any, paramsData: Record<string, string>, queryData: Record<string, string | string[]>, headersData: Record<string, string | string[]>, methodData: HttpMethod, pathData: string, originalUrlData: string, ipData: string, cookieHeader: string | undefined, rawBodyData: Buffer | undefined, rawRequest?: http.IncomingMessage, rawResponse?: http.ServerResponse, server?: HttpServer) {
+    super(bodyData, paramsData, queryData, headersData, methodData, pathData, originalUrlData, ipData, cookieHeader, rawBodyData)
     this.rawRequest = rawRequest
     this.rawResponse = rawResponse
     this.server = server
@@ -177,6 +177,7 @@ export class HttpServer {
         url, // originalUrl
         req.socket.remoteAddress || "",
         req.headers.cookie,
+        bodyResult.rawBody, // raw body buffer for webhook validation
         req, // pass the raw request for WebSocket upgrade
         res, // pass the raw response
         this // pass the server instance for WebSocket management

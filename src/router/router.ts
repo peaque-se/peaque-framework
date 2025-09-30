@@ -36,6 +36,29 @@ export function match(path: string, root: RouteNode): MatchResult | null {
   const stacks: Record<string, any[]> = {}
   const patternParts: string[] = []
 
+  function saveState() {
+    return {
+      names: { ...names },
+      stacks: Object.fromEntries(Object.entries(stacks).map(([k, v]) => [k, [...v]]))
+    }
+  }
+
+  function restoreState(saved: { names: Record<string, any>, stacks: Record<string, any[]> }) {
+    // Clear names
+    for (const key in names) {
+      delete names[key]
+    }
+    Object.assign(names, saved.names)
+
+    // Clear stacks
+    for (const key in stacks) {
+      delete stacks[key]
+    }
+    for (const [key, arr] of Object.entries(saved.stacks)) {
+      stacks[key] = [...arr]
+    }
+  }
+
   function descend(node: RouteNode, segIndex: number): MatchResult | null {
     // collect names and stacks
     node.names && Object.assign(names, node.names)
@@ -49,6 +72,17 @@ export function match(path: string, root: RouteNode): MatchResult | null {
       if (node.accept) {
         return { params: { ...params }, names: { ...names }, stacks: { ...stacks }, pattern: patternParts.join("") || "/" }
       } else {
+        // Try excluded children even at end of path
+        for (const child of node.staticChildren.values()) {
+          if (child.excludeFromPath) {
+            const saved = saveState()
+
+            const res = descend(child, segIndex)
+            if (res) return res
+
+            restoreState(saved)
+          }
+        }
         return null
       }
     }
@@ -60,8 +94,10 @@ export function match(path: string, root: RouteNode): MatchResult | null {
       const subNode = node.staticChildren.get(seg)!
       if (!subNode.excludeFromPath) {
         patternParts.push(`/${seg}`)
+        const saved = saveState()
         const res = descend(subNode, segIndex + 1)
         if (res) return res
+        restoreState(saved)
         patternParts.pop() // backtrack
       }
     }
@@ -74,8 +110,10 @@ export function match(path: string, root: RouteNode): MatchResult | null {
       } catch {
         params[node.paramChild.paramName] = seg
       }
+      const saved = saveState()
       const res = descend(node.paramChild, segIndex + 1)
       if (res) return res
+      restoreState(saved)
       delete params[node.paramChild.paramName]
       patternParts.pop() // backtrack
     }
@@ -90,13 +128,15 @@ export function match(path: string, root: RouteNode): MatchResult | null {
         }
         if (rest.length > 0) {
           try {
-            params[node.wildcardChild.paramName] = rest.map(seg => decodeURIComponent(seg)).join("/")
+            params[node.wildcardChild.paramName] = rest.map((seg) => decodeURIComponent(seg)).join("/")
           } catch {
             params[node.wildcardChild.paramName] = rest.join("/")
           }
         }
+        const saved = saveState()
         const res = descend(node.wildcardChild, segments.length)
         if (res) return res
+        restoreState(saved)
         if (rest.length > 0) {
           delete params[node.wildcardChild.paramName]
         }
@@ -110,8 +150,12 @@ export function match(path: string, root: RouteNode): MatchResult | null {
     // Try excluded children (don't consume path segment)
     for (const child of node.staticChildren.values()) {
       if (child.excludeFromPath) {
+        const saved = saveState()
+
         const res = descend(child, segIndex)
         if (res) return res
+
+        restoreState(saved)
       }
     }
 
