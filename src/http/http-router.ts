@@ -10,8 +10,14 @@ class RouteNode {
   middleware: RequestMiddleware[] = [] // Middleware stack for this route
 }
 
+function normalizePath(path: string): string {
+  const parts = path.split("/").filter(p => p !== "")
+  return "/" + parts.join("/")
+}
+
 export class Router {
   private routes: Map<HttpMethod, RouteNode> = new Map()
+  private staticRoutes: Map<string, { handler: RequestHandler, middleware: RequestMiddleware[], originalPath: string }> = new Map()
   private middlewareStack: RequestMiddleware[] = [] // Global middleware stack
   private fallbackHandler?: RequestHandler // Fallback handler for unmatched or unresponded requests
   // add a route to the router. the path can contain parameters like /api/user/:id/list
@@ -19,6 +25,13 @@ export class Router {
   // wildcard routes like /file/download/*filepath will capture the rest of the path
   // the parameters will be extracted and returned in the MatchingRoute object
   addRoute(method: HttpMethod, path: string, handler: RequestHandler): Router {
+    const hasParams = path.includes(':') || path.includes('*')
+    if (!hasParams) {
+      const normalized = normalizePath(path)
+      const key = `${method} ${normalized}`
+      this.staticRoutes.set(key, { handler, middleware: [...this.middlewareStack], originalPath: path })
+      return this
+    }
     if (!this.routes.has(method)) {
       this.routes.set(method, new RouteNode())
     }
@@ -62,6 +75,7 @@ export class Router {
     const newRouter = new Router()
     // Share the same route tree
     newRouter.routes = this.routes
+    newRouter.staticRoutes = this.staticRoutes
     // Copy the middleware stack and add the new middleware
     newRouter.middlewareStack = [...this.middlewareStack, middleware]
     // Copy the fallback handler
@@ -70,6 +84,19 @@ export class Router {
   }
 
   getMatchingRoute(method: HttpMethod, path: string): MatchingRoute | undefined {
+    // Check static routes first for O(1) lookup
+    const normalizedPath = normalizePath(path)
+    const key = `${method} ${normalizedPath}`
+    if (this.staticRoutes.has(key)) {
+      const route = this.staticRoutes.get(key)!
+      return {
+        method,
+        path: route.originalPath,
+        parameters: {},
+        handler: route.handler,
+        middleware: route.middleware,
+      }
+    }
     const root = this.routes.get(method)
     if (!root) return undefined
     const parts = path.split("/").filter((p) => p !== "")
