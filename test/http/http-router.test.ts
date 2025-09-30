@@ -398,8 +398,8 @@ describe('Router - Comprehensive HTTP Router Tests', () => {
 
   describe('Middleware Functionality', () => {
     test('should apply global middleware to all routes', () => {
-      const globalMiddleware: RequestMiddleware = jest.fn(async (req, next) => {
-        await next()
+      const globalMiddleware: RequestMiddleware = jest.fn(async (req: PeaqueRequest, next: RequestHandler) => {
+        await next(req)
       })
 
       router = router.use(globalMiddleware)
@@ -410,11 +410,11 @@ describe('Router - Comprehensive HTTP Router Tests', () => {
     })
 
     test('should chain multiple global middlewares', () => {
-      const middleware1: RequestMiddleware = jest.fn(async (req, next) => {
-        await next()
+      const middleware1: RequestMiddleware = jest.fn(async (req: PeaqueRequest, next: RequestHandler) => {
+        await next(req)
       })
-      const middleware2: RequestMiddleware = jest.fn(async (req, next) => {
-        await next()
+      const middleware2: RequestMiddleware = jest.fn(async (req: PeaqueRequest, next: RequestHandler) => {
+        await next(req)
       })
 
       router = router.use(middleware1).use(middleware2)
@@ -607,7 +607,7 @@ describe('Router - Comprehensive HTTP Router Tests', () => {
     })
 
     test('should handle async middleware', async () => {
-      const asyncMiddleware: RequestMiddleware = jest.fn(async (req, next) => {
+      const asyncMiddleware: RequestMiddleware = jest.fn(async (req: PeaqueRequest, next: RequestHandler) => {
         await new Promise(resolve => setTimeout(resolve, 10))
         await next(req)
       })
