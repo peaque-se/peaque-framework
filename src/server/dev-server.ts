@@ -143,6 +143,8 @@ export class DevServer {
       this.jobsRunner.startOrUpdateJobs()
       this.watchSourceFiles()
       await this.server.startServer(this.port)
+      // change window title to Peaque Framework - port
+      process.stdout.write(`\x1b]0;🌍 Peaque Framework ${platformVersion}\x07`)
       console.log(`🌍  ${colors.bold(colors.yellow("Peaque Framework " + platformVersion))} server running`)
       console.log(`     ${colors.green("✓")} Local ${colors.underline(`http://localhost:${this.port}`)}`)
       console.log(`     ${colors.green("✓")} Base path ${colors.gray(`${this.basePath}`)}`)
