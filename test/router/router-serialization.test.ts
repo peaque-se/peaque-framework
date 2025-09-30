@@ -13,7 +13,7 @@ const defaultConfig: RouteFileConfig[] = [
   { pattern: "middleware.ts", property: "middleware", stacks: false },
 ]
 
-function componentify(router: RouteNode, baseDir: string): Set<string> {
+function componentify(router: RouteNode<string>, baseDir: string): Set<string> {
   const imports = new Set<string>()
 
   function getComponentName(filePath: string): string {
@@ -26,13 +26,13 @@ function componentify(router: RouteNode, baseDir: string): Set<string> {
     return componentName
   }
 
-  function traverse(node: RouteNode) {
+  function traverse(node: RouteNode<string>) {
     // Convert names to component names
     if (node.names) {
       for (const key in node.names) {
         const name = node.names[key]
         const componentName = getComponentName(name)
-        node.names[key] = componentName
+        node.names[key] = componentName as string
         const filename = path.relative(baseDir, name)
         imports.add(`import ${componentName} from "./${filename.replace(/\\/g, "/")}";`)
       }
@@ -40,7 +40,7 @@ function componentify(router: RouteNode, baseDir: string): Set<string> {
     // Convert stacks to component names
     if (node.stacks) {
       for (const key in node.stacks) {
-        node.stacks[key] = node.stacks[key].map((name: string) => {
+        node.stacks[key] = node.stacks[key].map((name) => {
           const componentName = getComponentName(name)
           const filename = path.relative(baseDir, name)
           imports.add(`import ${componentName} from "./${filename.replace(/\\/g, "/")}";`)
@@ -106,7 +106,7 @@ describe("Router Serialization", () => {
   })
 
   test("should generate component imports", () => {
-    const mockRouter: RouteNode = {
+    const mockRouter: RouteNode<string> = {
       staticChildren: new Map(),
       accept: true,
       names: { page: "/test/page.tsx" },

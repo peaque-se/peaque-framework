@@ -1,11 +1,10 @@
 #!/usr/bin/env node
 
 import { spawn } from "child_process"
-import { buildForProduction } from "./prod-builder.js"
-import path from "path"
 import fs from "fs"
-import { runFastRefreshServer } from "./fast-refresh-server.js"
+import path from "path"
 import { DevServer } from "../server/dev-server.js"
+import { buildForProduction } from "../compiler/prod-builder.js"
 
 const command = process.argv[2]
 const args = process.argv.slice(3)
@@ -23,7 +22,7 @@ function showHelp() {
   console.log("")
   console.log("Commands:")
   console.log("  dev     Start development server")
-  console.log("  hmr     Start development server with HMR (alias for dev)")
+  console.log("  hmr     Start development server (alias for dev)")
   console.log("  build   Build the application for production")
   console.log("  start   Start the production server")
   console.log("")
@@ -36,7 +35,6 @@ function showHelp() {
 
 async function main() {
   if (command === "dev" || command === "hmr") {
-    //await runFastRefreshServer(basePath, port, noStrict)
     const devServer = new DevServer(basePath, port, noStrict);
     await devServer.start();
     process.on('SIGINT', () => {

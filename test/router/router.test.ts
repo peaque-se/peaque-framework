@@ -264,13 +264,13 @@ describe('Router - Comprehensive Tests', () => {
     })
 
     test('should not leak stacks from failed excluded routes', () => {
-      const root: RouteNode = {
-        staticChildren: new Map([
+      const root: RouteNode<string> = {
+        staticChildren: new Map<string, RouteNode<string>>([
           ["(auth)", {
             excludeFromPath: true,
-            staticChildren: new Map([
+            staticChildren: new Map<string, RouteNode<string>>([
               ["login", {
-                staticChildren: new Map(),
+                staticChildren: new Map<string, RouteNode<string>>(),
                 names: { page: "/(auth)/login/page.tsx" },
                 stacks: {},
                 accept: true
@@ -282,7 +282,7 @@ describe('Router - Comprehensive Tests', () => {
           }],
           ["(admin)", {
             excludeFromPath: true,
-            staticChildren: new Map(),
+            staticChildren: new Map<string, RouteNode<string>>(),
             names: { page: "/(admin)/page.tsx" },
             stacks: { middleware: ["/(admin)/middleware.ts"] },
             accept: true

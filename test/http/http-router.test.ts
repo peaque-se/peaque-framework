@@ -32,6 +32,10 @@ class MockPeaqueRequest implements PeaqueRequest {
     return this._body as T
   }
 
+  rawBody(): Buffer | undefined {
+    return undefined
+  }
+
   isResponded(): boolean {
     return this._responded
   }
