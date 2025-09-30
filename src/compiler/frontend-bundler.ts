@@ -42,18 +42,27 @@ export interface FrontendBuildResult {
   /** Source files only (excluding node_modules and externals) */
   sourceDependencies?: DependencyInfo[]
   /** Build metadata */
-  metafile?: any
+  metafile?: Metafile
   /** Bundle content as string (when writeToFile is false) */
   bundleContent?: string
   /** Source map content as string (when writeToFile is false and sourcemap is true) */
   sourceMapContent?: string
 }
 
+interface MetafileInput {
+  bytes?: number
+  imports?: Array<{ path: string }>
+}
+
+interface Metafile {
+  inputs?: Record<string, MetafileInput>
+}
+
 /**
  * Extract dependency information from esbuild metafile
  */
 function extractDependencies(
-  metafile: any,
+  metafile: Metafile | undefined,
   externalPackages: string[] = []
 ): {
   dependencies: DependencyInfo[]
@@ -69,7 +78,7 @@ function extractDependencies(
   // Collect all external packages for filtering
   const allExternals = new Set(["react", "react-dom", ...externalPackages])
 
-  for (const [inputPath, inputInfo] of Object.entries(metafile.inputs) as [string, any][]) {
+  for (const [inputPath, inputInfo] of Object.entries(metafile.inputs)) {
     // Normalize path to absolute
     const absolutePath = path.isAbsolute(inputPath) ? inputPath : path.resolve(process.cwd(), inputPath)
 
@@ -161,7 +170,7 @@ export class FrontendBundler {
       ...alias,
     }
 
-    const buildOptions: any = {
+    const buildOptions: Parameters<typeof context>[0] = {
       bundle: true,
       format: "esm",
       target: "es2020",

@@ -9,7 +9,7 @@ export interface RequestMiddleware {
 }
 
 export interface PeaqueRequest {
-  body<T = any>(): T
+  body<T = unknown>(): T
   rawBody(): Buffer | undefined
   isResponded(): boolean
   path(): string
@@ -31,11 +31,11 @@ export interface PeaqueRequest {
   code(statusCode: number): PeaqueRequest
   header(name: string, value: string): PeaqueRequest
   type(contentType: string): PeaqueRequest
-  send<T = any>(data?: T): void
+  send<T = unknown>(data?: T): void
   redirect(url: string, code?: number): void
 
   responseCode(): number
-  responseBody(): any
+  responseBody(): unknown
 
   isUpgradeRequest(): boolean
   upgradeToWebSocket(handler: WebSocketHandler): PeaqueWebSocket

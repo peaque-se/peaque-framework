@@ -34,7 +34,7 @@ const apiRouterConfig: RouteFileConfig[] = [
   { pattern: "middleware.ts", property: "middleware", stacks: true },
 ]
 
-function componentify(router: RouteNode, baseDir: string): Set<string> {
+function componentify(router: RouteNode<string>, baseDir: string): Set<string> {
   const imports = new Set<string>()
 
   function getComponentName(filePath: string): string {
@@ -47,7 +47,7 @@ function componentify(router: RouteNode, baseDir: string): Set<string> {
     return componentName
   }
 
-  function traverse(node: RouteNode) {
+  function traverse(node: RouteNode<string>) {
     // Convert names to component names
     if (node.names) {
       for (const key in node.names) {
@@ -99,9 +99,9 @@ function checkSpecialPage(pagesDir: string, fileName: string): string | null {
   return null
 }
 
-function safeBuildRouter(dirPath: string, config: RouteFileConfig[]): RouteNode {
+function safeBuildRouter(dirPath: string, config: RouteFileConfig[]): RouteNode<string> {
   if (existsSync(dirPath)) {
-    return buildRouter(dirPath, config)
+    return buildRouter(dirPath, config) as RouteNode<string>
   }
   // Return empty router if directory doesn't exist
   return { staticChildren: new Map(), names: {}, stacks: {}, accept: false }
@@ -113,9 +113,9 @@ export class DevServer {
   private port: number
   private noStrict: boolean
   private server: HttpServer
-  private frontend: RouteNode
+  private frontend: RouteNode<string>
   private frontendImports: Set<string>
-  private backend: RouteNode
+  private backend: RouteNode<string>
   private moduleCache: FileCache<any> = new FileCache()
   private moduleLoader: ModuleLoader
   private jobsRunner: JobsRunner

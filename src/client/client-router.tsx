@@ -115,13 +115,13 @@ export function findMatch(root: RouteNode, path: string): MatchResult | null {
   const m = match(path, root)
   if (!m) return null
   const result : MatchResult = {
-    component: m.names.page,
+    component: m.names.page as React.ComponentType<any>,
     pattern: m.pattern,
-    layouts: m.stacks.layout || [],
+    layouts: (m.stacks.layout || []) as React.ComponentType<any>[],
     params: m.params,
-    guards: m.stacks.guards || [],
-    middleware: m.stacks.middleware || [],
-    heads: m.stacks.heads || [],
+    guards: (m.stacks.guards || []) as PageGuard[],
+    middleware: (m.stacks.middleware || []) as PageMiddleware[],
+    heads: (m.stacks.heads || []) as HeadDefinition[],
   }
   return result
 }

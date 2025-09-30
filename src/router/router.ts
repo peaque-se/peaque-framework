@@ -1,12 +1,12 @@
-export interface RouteNode {
+export interface RouteNode<T = unknown> {
   /** Static children (literal folder names) */
-  staticChildren: Map<string, RouteNode>
+  staticChildren: Map<string, RouteNode<T>>
 
   /** Param child (e.g. [id] → :id) */
-  paramChild?: RouteNode & { paramName: string }
+  paramChild?: RouteNode<T> & { paramName: string }
 
   /** Wildcard child (e.g. [...wildcard] and [...wildcard]?) */
-  wildcardChild?: RouteNode & { paramName: string; optional: boolean }
+  wildcardChild?: RouteNode<T> & { paramName: string; optional: boolean }
 
   /** Whether this folder is excluded from the URL path */
   excludeFromPath?: boolean
@@ -14,26 +14,28 @@ export interface RouteNode {
   /** is this path an acceptable end? */
   accept: boolean
 
-  /** Properties that will be aggregated in the match. */
-  names: Record<string, any>
-  stacks: Record<string, any[]>
+  /** Properties that will be aggregated in the match. Type depends on context. */
+  names: Record<string, T>
+  /** Arrays that will be aggregated in the match. Type depends on context. */
+  stacks: Record<string, T[]>
 }
 
-export interface MatchResult {
+export interface MatchResult<T = unknown> {
   /** The matched route pattern */
   pattern: string
   /** Route parameters */
   params: Record<string, string>
-  /** names and stacks */
-  names: Record<string, any>
-  stacks: Record<string, any[]>
+  /** Named properties from the route */
+  names: Record<string, T>
+  /** Stacked arrays from the route */
+  stacks: Record<string, T[]>
 }
 
-export function match(path: string, root: RouteNode): MatchResult | null {
+export function match<T = unknown>(path: string, root: RouteNode<T>): MatchResult<T> | null {
   const segments = path.split("/").filter(Boolean)
   const params: Record<string, string> = {}
-  const names: Record<string, any> = {}
-  const stacks: Record<string, any[]> = {}
+  const names: Record<string, T> = {}
+  const stacks: Record<string, T[]> = {}
   const patternParts: string[] = []
 
   function saveState() {
@@ -43,7 +45,7 @@ export function match(path: string, root: RouteNode): MatchResult | null {
     }
   }
 
-  function restoreState(saved: { names: Record<string, any>, stacks: Record<string, any[]> }) {
+  function restoreState(saved: { names: Record<string, T>, stacks: Record<string, T[]> }) {
     // Clear names
     for (const key in names) {
       delete names[key]
@@ -59,7 +61,7 @@ export function match(path: string, root: RouteNode): MatchResult | null {
     }
   }
 
-  function descend(node: RouteNode, segIndex: number): MatchResult | null {
+  function descend(node: RouteNode<T>, segIndex: number): MatchResult<T> | null {
     // collect names and stacks
     node.names && Object.assign(names, node.names)
     for (const [key, arr] of Object.entries(node.stacks || {})) {

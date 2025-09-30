@@ -10,14 +10,25 @@ import * as esbuild from "esbuild"
 import { createRequire } from "module"
 import { makeImportsRelative } from "./imports.js"
 
+interface PackageJson {
+  name?: string
+  version?: string
+  main?: string
+  module?: string
+  type?: string
+  exports?: unknown
+  dependencies?: Record<string, string>
+}
+
 /// Determines if a package.json indicates an ES module
 /// This is based on the presence of "module" field, the "type" field,
 /// and the extensions of the "main" field.
-function isESMModule(pkgJson: any): boolean {
+function isESMModule(pkgJson: PackageJson): boolean {
   if (!pkgJson) return false
   if (pkgJson.module) return true
   // if the export contains . and it has an import field, it's ESM
-  if (pkgJson.exports && typeof pkgJson.exports === "object" && pkgJson.exports["."] && pkgJson.exports["."].import) return true
+  const exports = pkgJson.exports as Record<string, unknown> | undefined
+  if (exports && typeof exports === "object" && exports["."] && typeof exports["."] === "object" && (exports["."] as Record<string, unknown>).import) return true
   if (pkgJson.main && pkgJson.main.endsWith(".cjs")) return false
   if (pkgJson.main && pkgJson.main.endsWith(".mjs")) return true
 
@@ -34,7 +45,7 @@ const dependencies: string[] = []
 /// using a dynamic import and then re-exports the named exports and the default export.
 /// Then we bundle this wrapper module using esbuild and mark the dependencies as external.
 /// Finally, we convert any remaining require calls to imports for react and scheduler (TODO: generalize this)
-async function bundleCommonJSModule(moduleName: string, pkgJson: any, basePath: string): Promise<string> {
+async function bundleCommonJSModule(moduleName: string, pkgJson: PackageJson, basePath: string): Promise<string> {
   const moduleBaseName = moduleName.split("/")[0]
   const require = createRequire("file://" + path.join(basePath, "noop.js").replace(/\\/g, "/"))
   const mod = require(moduleName)
@@ -102,7 +113,7 @@ function convertRequiresToImports(bundledCode: string): string {
 /// This is simpler than the CJS case because we can just re-export everything
 /// and let esbuild handle the tree-shaking and bundling.
 /// We still need to mark dependencies as external to avoid bundling them.
-export async function bundleESMModule(moduleName: string, moduleBaseName: string, pkgJson: any, basePath: string): Promise<string> {
+export async function bundleESMModule(moduleName: string, moduleBaseName: string, pkgJson: PackageJson, basePath: string): Promise<string> {
   let code = `export * from ${JSON.stringify(moduleName)};\n`
   const result = await esbuild.build({
     stdin: {
@@ -146,7 +157,7 @@ export function setBaseDependencies(basePath: string) {
   if (!fs.existsSync(pkgPath)) {
     throw new Error(`No package.json found in the current directory: ${basePath}`)
   }
-  const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"))
+  const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8")) as PackageJson
   const deps = Object.keys(pkg.dependencies || {})
   dependencies.push(...deps)
 }
@@ -158,7 +169,7 @@ export async function bundleModuleFromNodeModules(moduleName: string, basePath: 
   const moduleBaseName = findModuleName(moduleName, basePath)
 
   const pkgJsonPath = path.join(basePath, "node_modules", moduleBaseName, "package.json")
-  const pkgJson = JSON.parse(fs.readFileSync(pkgJsonPath, "utf-8"))
+  const pkgJson = JSON.parse(fs.readFileSync(pkgJsonPath, "utf-8")) as PackageJson
 
   const isESM = isESMModule(pkgJson)
 
