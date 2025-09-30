@@ -484,7 +484,7 @@ require("./server_without_env.js")
 `
   await bundleBackendProgram({
     baseDir: outDir,
-    outfile: path.join(outDir, "main.js"),
+    outfile: path.join(outDir, "main.cjs"),
     inputContent: mainJs,
     minify: true,
     sourcemap: false,

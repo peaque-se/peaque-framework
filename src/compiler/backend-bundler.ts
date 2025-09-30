@@ -74,7 +74,8 @@ export async function bundleBackendProgram(options: BackendBundleOptions): Promi
         "tls",
         "v8",
         "vm",
-        "@prisma"
+        "@prisma",
+        "esbuild"
         // Externalize the framework itself since it will be a dependency
         //'@peaque/framework',
         // Externalize all route imports

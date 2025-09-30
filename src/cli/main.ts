@@ -49,15 +49,15 @@ async function main() {
     process.exit(0)
   } else if (command === "start") {
     console.log(`🚀  Starting @peaque/framework production server for ${basePath}`)
-    const inDist = fs.existsSync(path.join(basePath, "dist", "main.js"))
-    const inSrc = fs.existsSync(path.join(basePath, "main.js"))
+    const inDist = fs.existsSync(path.join(basePath, "dist", "main.cjs"))
+    const inSrc = fs.existsSync(path.join(basePath, "main.cjs"))
     const cwd = inDist ? path.join(basePath, "dist") : basePath
     if (!inDist && !inSrc) {
-      console.error(`No main.js found in ${basePath} or ${path.join(basePath, "dist")}. Please run "peaque build" first.`)
+      console.error(`No main.cjs found in ${basePath} or ${path.join(basePath, "dist")}. Please run "peaque build" first.`)
       process.exit(1)
     }
 
-    const child = spawn("node", ["./main.js"], { cwd })
+    const child = spawn("node", ["./main.cjs"], { cwd })
     child.stdout.pipe(process.stdout)
     child.stderr.pipe(process.stderr)
     child.on("close", (code) => {

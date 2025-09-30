@@ -1,6 +1,6 @@
 {
   "name": "@peaque/framework",
-  "version": "2.2.8",
+  "version": "2.2.9",
   "description": "The last javascript framework ever to be needed",
   "type": "module",
   "license": "MIT",
@@ -74,6 +74,7 @@
   "peerDependencies": {
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "react-refresh": "^0.17.0"
+    "react-refresh": "^0.17.0",
+    "tailwindcss": "^4.1.13"
   }
 }
