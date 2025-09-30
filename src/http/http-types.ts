@@ -9,7 +9,7 @@ export interface RequestMiddleware {
 }
 
 export interface PeaqueRequest {
-  body<T = unknown>(): T
+  body<T = any>(): T
   rawBody(): Buffer | undefined
   isResponded(): boolean
   path(): string

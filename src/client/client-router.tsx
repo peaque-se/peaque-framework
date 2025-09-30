@@ -127,18 +127,22 @@ export function findMatch(root: RouteNode, path: string): MatchResult | null {
 }
 
 export function navigate(path: string) {
-  window.history.pushState(null, "", path)
+  // Save current scroll position before navigating
+  const scrollPos = { x: window.scrollX, y: window.scrollY }
+  window.history.replaceState({ ...window.history.state, scrollPos }, "")
+
+  window.history.pushState({ scrollPos: { x: 0, y: 0 } }, "", path)
   window.dispatchEvent(new PopStateEvent("popstate"))
 }
 
 export function redirect(path: string) {
-  window.history.replaceState(null, "", path)
+  window.history.replaceState({ scrollPos: { x: 0, y: 0 } }, "", path)
   window.dispatchEvent(new PopStateEvent("popstate"))
 }
 
 function Navigate({ to }: { to: string }) {
   useEffect(() => {
-    window.history.replaceState(null, "", to)
+    window.history.replaceState({ scrollPos: { x: 0, y: 0 } }, "", to)
     window.dispatchEvent(new PopStateEvent("popstate"))
   }, [to])
   return null
@@ -241,9 +245,30 @@ export function Router({ root, loading = <div>Loading...</div>, missing = <div>4
   }>({ status: "pending" })
 
   useEffect(() => {
+    // Take manual control of scroll restoration
+    if (window.history.scrollRestoration) {
+      window.history.scrollRestoration = "manual"
+    }
+
     const handlePop = () => setPath(window.location.pathname)
     window.addEventListener("popstate", handlePop)
-    return () => window.removeEventListener("popstate", handlePop)
+
+    // Continuously update scroll position in history state
+    let scrollTimeout: NodeJS.Timeout | null = null
+    const handleScroll = () => {
+      if (scrollTimeout) clearTimeout(scrollTimeout)
+      scrollTimeout = setTimeout(() => {
+        const scrollPos = { x: window.scrollX, y: window.scrollY }
+        window.history.replaceState({ ...window.history.state, scrollPos }, "")
+      }, 100)
+    }
+    window.addEventListener("scroll", handleScroll)
+
+    return () => {
+      window.removeEventListener("popstate", handlePop)
+      window.removeEventListener("scroll", handleScroll)
+      if (scrollTimeout) clearTimeout(scrollTimeout)
+    }
   }, [])
 
   useEffect(() => {
@@ -306,6 +331,30 @@ export function Router({ root, loading = <div>Loading...</div>, missing = <div>4
     setGuardState({ status: "pending" })
     runGuards()
   }, [path, root])
+
+  // Handle scroll position after navigation
+  useEffect(() => {
+    if (guardState.status === "allowed") {
+      const scrollPos = window.history.state?.scrollPos
+      const currentScrollY = window.scrollY
+
+      // Wait for content to render and async data to load
+      const timeoutId = setTimeout(() => {
+        // Only scroll if user hasn't scrolled yet (avoid jarring jumps)
+        if (Math.abs(window.scrollY - currentScrollY) < 50) {
+          if (scrollPos) {
+            // Restore saved scroll position (back/forward navigation)
+            window.scrollTo(scrollPos.x, scrollPos.y)
+          } else {
+            // Scroll to top (new navigation)
+            window.scrollTo(0, 0)
+          }
+        }
+      }, 50)
+
+      return () => clearTimeout(timeoutId)
+    }
+  }, [guardState])
 
   if (guardState.status === "404") return <>{missing}</>
   if (guardState.status === "pending") return <>{loading}</>

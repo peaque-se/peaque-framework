@@ -139,25 +139,3 @@ export async function bundleBackendProgram(options: BackendBundleOptions): Promi
     throw new Error(`Failed to bundle backend program: ${error instanceof Error ? error.message : String(error)}`)
   }
 }
-
-/**
- * Convenience function to bundle and generate a backend program in one step
- */
-export async function generateAndBundleBackend(options: { baseDir?: string; importPrefix?: string; outfile: string; minify?: boolean; sourcemap?: boolean; target?: string }): Promise<BackendBundleResult> {
-  // Import the backend generator dynamically to avoid circular dependencies
-  const { generateBackendProgram } = await import("./backend-generator.js")
-
-  const generatedCode = await generateBackendProgram({
-    baseDir: options.baseDir,
-    importPrefix: options.importPrefix,
-  })
-
-  return await bundleBackendProgram({
-    inputContent: generatedCode.content,
-    baseDir: options.baseDir,
-    outfile: options.outfile,
-    minify: options.minify,
-    sourcemap: options.sourcemap,
-    target: options.target,
-  })
-}
