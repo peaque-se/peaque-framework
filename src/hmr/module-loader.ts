@@ -2,6 +2,7 @@ import path from 'node:path'
 import fs from 'node:fs'
 import { pathToFileURL, fileURLToPath } from 'node:url'
 import * as esbuild from 'esbuild'
+import { registerSourceMap } from '../exceptions/sourcemaps.js'
 
 type BuildContext = {
   ctx: esbuild.BuildContext
@@ -91,6 +92,8 @@ export class ModuleLoader {
         outfile: outFile,
         absWorkingDir,
         sourcemap: 'external',
+        // sourceRoot: path.relative(absWorkingDir, path.dirname(entryPath)).replace(/\\/g, '/'),
+        // outdir: path.dirname(entryPath),
         tsconfig: this.options.tsconfig,
         alias: { '@': aliasAt, 'react': 'react', 'react-dom': 'react-dom' },
         external: ['react', 'react-dom'],
@@ -112,8 +115,25 @@ export class ModuleLoader {
     }
 
     const moduleHref = pathToFileURL(buildContext.outfile).href + `?v=${++ModuleLoader.importCounter}`
+
+    // load the source map and register it
+    if (fs.existsSync(outFile + '.map')) {
+      const sourceMap = JSON.parse(fs.readFileSync(outFile + '.map', 'utf-8'))
+      // patch the sources to be relative to the absWorkingDir
+      const orig = JSON.stringify(sourceMap.sources)
+      if (sourceMap.sources && Array.isArray(sourceMap.sources)) {
+        sourceMap.sources = sourceMap.sources.map((src: string) => {
+          const absolutePath = path.resolve(path.dirname(outFile), src)
+          const relativeToAbsWorkingDir = path.relative(absWorkingDir, absolutePath)
+          return `${relativeToAbsWorkingDir.replace(/\\/g, '/')}`
+        })
+      }
+      registerSourceMap(moduleHref, sourceMap)
+    }
+
     const result = await import(moduleHref)
-    // fs.unlinkSync(buildContext.outfile)
+    fs.unlinkSync(buildContext.outfile)
+    fs.unlinkSync(buildContext.outfile + '.map')
     return result
   }
 

@@ -56,7 +56,7 @@ export function match(path: string, root: RouteNode): MatchResult | null {
     const seg = segments[segIndex]
 
     // Try static match
-    if (seg && node.staticChildren.has(seg)) {
+    if (seg && node.staticChildren && node.staticChildren.has(seg)) {
       const subNode = node.staticChildren.get(seg)!
       if (!subNode.excludeFromPath) {
         patternParts.push(`/${seg}`)
