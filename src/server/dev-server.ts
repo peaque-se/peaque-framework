@@ -342,14 +342,27 @@ export class DevServer {
   }
 
   private async serveBundledSrcFile(req: PeaqueRequest) {
-    const srcPath = req.path().substring(5) // remove /@src/
+    const srcPath = path.normalize(req.path().substring(5)) // remove /@src/ and normalize
     const extensions = ["", ".ts", ".tsx", ".js", ".jsx", "/index.ts", "/index.tsx", "/index.js", "/index.jsx"]
-    const fullPath = extensions.map((ext) => path.join(this.basePath, srcPath + ext)).find((p) => existsSync(p) && statSync(p).isFile())
+    const resolvedBasePath = path.resolve(this.basePath)
+
+    const fullPath = extensions
+      .map((ext) => path.join(this.basePath, srcPath + ext))
+      .map((p) => path.resolve(p))
+      .find((p) => {
+        // Validate that the resolved path is within the base directory
+        if (!p.startsWith(resolvedBasePath + path.sep) && p !== resolvedBasePath) {
+          return false
+        }
+        return existsSync(p) && statSync(p).isFile()
+      })
+
     if (!fullPath) {
       console.error(`File not found: ${srcPath} (tried with extensions: ${extensions.join(", ")})`)
       req.code(404).send("File not found")
       return
     }
+
     try {
       const srcContent = readFileSync(fullPath, "utf-8")
       const fastifyContent = fastRefreshify(srcContent, srcPath)
@@ -493,7 +506,18 @@ if (typeof window !== 'undefined') {
   }
 
   private serveFileFromPublicDir(req: PeaqueRequest) {
-    const absFile = this.basePath + "/src/public" + req.path()
+    const publicDir = path.join(this.basePath, "src", "public")
+    const requestedPath = path.normalize(req.path())
+    const absFile = path.join(publicDir, requestedPath)
+
+    // Validate that the resolved path is within the public directory
+    const resolvedPath = path.resolve(absFile)
+    const resolvedPublicDir = path.resolve(publicDir)
+    if (!resolvedPath.startsWith(resolvedPublicDir + path.sep) && resolvedPath !== resolvedPublicDir) {
+      req.code(403).send("Forbidden")
+      return
+    }
+
     const contents = readFileSync(absFile)
     const contentType = contentTypeRegistry[extname(basename(absFile))] || "application/octet-stream"
     req.code(200).header("Content-Type", contentType).send(contents)
