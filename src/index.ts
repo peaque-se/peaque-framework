@@ -1,5 +1,3 @@
-import { InterruptFurtherProcessing } from './exceptions/index.js';
-
 // Main exports for the Peaque framework
 export {
   Router,

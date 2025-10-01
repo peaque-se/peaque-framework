@@ -132,7 +132,6 @@ export class DevServer {
     this.noStrict = noStrict
     this.server = new HttpServer((r) => this.handler(r))
     this.moduleLoader = new ModuleLoader({ absWorkingDir: basePath })
-    setupSourceMaps()
     this.jobsRunner = new JobsRunner(basePath)
 
     this.frontend = safeBuildRouter(this.basePath + "/src/pages", pageRouterConfig)
@@ -151,11 +150,17 @@ export class DevServer {
     const tsconfigPath = path.join(basePath, "tsconfig.json")
     if (existsSync(tsconfigPath)) {
       const tsconfigContent = readFileSync(tsconfigPath, "utf-8")
-      const tsconfigJson = JSON.parse(tsconfigContent)
-      setupImportAliases(tsconfigJson)
+      try {
+        const tsconfigJson = JSON.parse(tsconfigContent)
+        setupImportAliases(tsconfigJson)
+      } catch (err) {
+        console.error(`Error parsing ${tsconfigPath}:`, err)
+      }
     }
 
     setBaseDependencies(basePath)
+
+    setupSourceMaps()
 
     if (existsSync(path.join(basePath, "src/middleware.ts"))) {
       this.moduleLoader

@@ -1,52 +1,56 @@
 #!/usr/bin/env node
 
 import { spawn } from "child_process"
+import { Command } from "commander"
 import fs from "fs"
 import path from "path"
-import { DevServer } from "../server/dev-server.js"
 import { buildForProduction } from "../compiler/prod-builder.js"
+import { DevServer } from "../server/dev-server.js"
+import { platformVersion } from "../server/version.js"
 
-const command = process.argv[2]
-const args = process.argv.slice(3)
-const noStrict = args.includes("--no-strict") || args.includes("-ns")
-const portIndex = args.findIndex(arg => arg === "-p" || arg === "--port")
-const port = portIndex !== -1 && args.length > portIndex + 1 ? parseInt(args[portIndex + 1], 10) : 3000
-let basePath = process.cwd()
-const basePathIndex = args.findIndex(arg => arg === "--base" || arg === "-b")
-if (basePathIndex !== -1 && args.length > basePathIndex + 1) {
-  basePath = args[basePathIndex + 1]
-}
+const program = new Command()
+program.name("peaque").description("Peaque Framework CLI").version(platformVersion)
 
-function showHelp() {
-  console.log("Usage: peaque <command> [options]")
-  console.log("")
-  console.log("Commands:")
-  console.log("  dev     Start development server")
-  console.log("  hmr     Start development server (alias for dev)")
-  console.log("  build   Build the application for production")
-  console.log("  start   Start the production server")
-  console.log("")
-  console.log("Options:")
-  console.log("  -h, --help            Show this help message")
-  console.log("  -b, --base <path>     Specify the project base path (default: current directory)")
-  console.log("  -p, --port <port>     Specify the port for the development server (default: 3000)")
-  console.log("  -ns, --no-strict      Disable react strict mode")
-}
+program
+  .command("dev")
+  .description("Start development server")
+  .option("-p, --port <port>", "change the port for the development server", "3000")
+  .option("-b, --base <path>", "load project from other base path (default: current directory)")
+  .option("-n, --no-strict", "disable react strict mode", false)
+  .action(function () {
+    const path = this.opts().base || process.cwd()
+    const devServer = new DevServer(path, this.opts().port, !this.opts().strict)
+    devServer.start()
+    process.on("SIGINT", () => {
+      devServer.stop("SIGINT")
+      process.exit()
+    })
+  })
 
-async function main() {
-  if (command === "dev" || command === "hmr") {
-    const devServer = new DevServer(basePath, port, noStrict);
-    await devServer.start();
-    process.on('SIGINT', () => {
-      devServer.stop("SIGINT").then(() => {
-        process.exit(0);
-      });
-    });
-  } else if (command === "build") {
-    await buildForProduction(basePath)
-    process.exit(0)
-  } else if (command === "start") {
-    console.log(`🚀  Starting @peaque/framework production server for ${basePath}`)
+program
+  .command("build")
+  .description("Build the application for production")
+  .option("-o, --output <output>", "specify the output directory (default: ./dist)")
+  .option("-b, --base <path>", "load project from other base path (default: current directory)")
+  .action(function () {
+    const basePath = this.opts().base || process.cwd()
+    buildForProduction(basePath, this.opts().output || path.join(basePath, "dist"))
+      .then(() => {
+        process.exit(0)
+      })
+      .catch((err) => {
+        console.log("Build error:", err)
+        process.exit(1)
+      })
+  })
+
+program
+  .command("start")
+  .description("Start the production server")
+  .option("-b, --base <path>", "load project from other base path (default: current directory)")
+  .option("-p, --port <port>", "change the port for the production server", "3000")
+  .action(function () {
+    const basePath = this.opts().base || process.cwd()
     const inDist = fs.existsSync(path.join(basePath, "dist", "main.cjs"))
     const inSrc = fs.existsSync(path.join(basePath, "main.cjs"))
     const cwd = inDist ? path.join(basePath, "dist") : basePath
@@ -54,21 +58,16 @@ async function main() {
       console.error(`No main.cjs found in ${basePath} or ${path.join(basePath, "dist")}. Please run "peaque build" first.`)
       process.exit(1)
     }
-
-    const child = spawn("node", ["./main.cjs"], { cwd })
+    const child = spawn("node", ["./main.cjs", "--port", this.opts().port], { cwd })
     child.stdout.pipe(process.stdout)
     child.stderr.pipe(process.stderr)
     child.on("close", (code) => {
       process.exit(code)
     })
-  } else {
-    console.error(`Unknown command: ${command}`)
-    showHelp()
-    process.exit(1)
-  }
-}
+    process.on("SIGINT", () => {
+      child.kill("SIGINT")
+      process.exit(0)
+    })
+  })
 
-main().catch((err) => {
-  console.error("Error running Peaque CLI:", err)
-  process.exit(1)
-})
+program.parse(process.argv)

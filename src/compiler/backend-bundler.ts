@@ -1,5 +1,7 @@
 import * as esbuild from "esbuild"
-
+import { OnResolveArgs, OnResolveResult, Plugin, PluginBuild } from "esbuild"
+import path from "path"
+import { fileURLToPath } from "url"
 export interface BackendBundleOptions {
   /** The input TypeScript content as a string */
   inputContent: string
@@ -26,6 +28,45 @@ export interface BackendBundleResult {
   metafile?: esbuild.Metafile
 }
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+
+export function frameworkDepsPlugin(deps: string[]): Plugin {
+  return {
+    name: "framework-deps",
+    setup: function (build: PluginBuild) {
+      build.onResolve({ filter: /.*/ }, (args: OnResolveArgs): OnResolveResult | null => {
+        if (!deps.includes(args.path)) return null
+        try {
+          const resolved = require.resolve(args.path, { paths: [__dirname] })
+          return { path: resolved }
+        } catch {
+          return null
+        }
+      })
+    },
+  }
+}
+
+export function excludeDevModulesPlugin(): Plugin {
+  return {
+    name: "exclude-dev-modules",
+    setup: function (build: PluginBuild) {
+      // Prevent esbuild from loading dev-only modules by returning empty content
+      build.onLoad({ filter: /.*/ }, (args) => {
+        // Check if this is a dev-only module path
+        if (args.path.includes("/server/dev-server") || args.path.includes("\\server\\dev-server") || args.path.includes("/jobs/jobs-runner") || args.path.includes("\\jobs\\jobs-runner") || args.path.includes("/hmr/module-loader") || args.path.includes("\\hmr\\module-loader") || args.path.includes("/compiler/hash-file") || args.path.includes("\\compiler\\hash-file") || args.path.includes("/cli/") || args.path.includes("\\cli\\")) {
+          // Return empty module - prevents esbuild from processing these files and their imports
+          return {
+            contents: "// Dev-only module excluded from production bundle",
+            loader: "js",
+          }
+        }
+        return null
+      })
+    },
+  }
+}
+
 /**
  * Bundles a generated backend server program into a single runnable JavaScript file using esbuild
  */
@@ -44,7 +85,7 @@ export async function bundleBackendProgram(options: BackendBundleOptions): Promi
       bundle: true,
       platform: "node",
       target: target,
-      format: "cjs", // was 'esm', changed to 'cjs' for better compatibility
+      format: "cjs",
       outfile: outfile,
       minify: minify,
       sourcemap: sourcemap,
@@ -74,12 +115,8 @@ export async function bundleBackendProgram(options: BackendBundleOptions): Promi
         "tls",
         "v8",
         "vm",
-        "@prisma",
-        "esbuild"
-        // Externalize the framework itself since it will be a dependency
-        //'@peaque/framework',
-        // Externalize all route imports
-        //...routeImports
+        // "@prisma",
+        // "esbuild"
       ],
       // Resolve imports relative to the base directory
       absWorkingDir: baseDir,
@@ -109,8 +146,14 @@ export async function bundleBackendProgram(options: BackendBundleOptions): Promi
       treeShaking: true,
       // Generate metafile for analysis
       metafile: true,
+      plugins: [excludeDevModulesPlugin(), frameworkDepsPlugin(["croner", "react-refresh", "react", "react-dom", "tailwindcss"])],
     } // Run esbuild
     const result = await esbuild.build(esbuildOptions)
+
+    // if (result.metafile) {
+    //   const text = await esbuild.analyzeMetafile(result.metafile)
+    //   fs.writeFileSync(outfile + ".meta.txt", text, "utf-8")
+    // }
 
     // Check for build errors
     if (result.errors.length > 0) {

@@ -1,17 +1,18 @@
 import * as fs from "fs"
+import { globSync } from "glob"
 import path from "path"
 import colors from "yoctocolors"
 import { precompressAssets } from "../assets/precompress-assets.js"
 import { mergeHead, renderHead } from "../client/head.js"
-import { bundleBackendProgram } from "./backend-bundler.js"
-import { FrontendBundler } from "./frontend-bundler.js"
-import { bundleCssFile } from "./tailwind-bundler.js"
 import { ModuleLoader } from "../hmr/module-loader.js"
 import { HeadDefinition } from "../index.js"
 import { buildRouter, RouteFileConfig } from "../router/builder.js"
 import { RouteNode } from "../router/router.js"
 import { serializeRouterToJs } from "../router/serializer.js"
 import { platformVersion } from "../server/version.js"
+import { bundleBackendProgram } from "./backend-bundler.js"
+import { FrontendBundler } from "./frontend-bundler.js"
+import { bundleCssFile } from "./tailwind-bundler.js"
 
 const pageRouterConfig: RouteFileConfig[] = [
   { pattern: "page.tsx", property: "page", stacks: false, accept: true },
@@ -253,13 +254,47 @@ function detectExportedMethods(filePath: string): string[] {
   return exportedMethods
 }
 
+ function buildJobsFunction(basePath: string, imports: string[]): string {
+  const jobsDir = path.join(basePath, "src", "jobs")
+  const jobFiles = globSync(`${jobsDir}/**/job.ts`)
+
+  const program = [];
+  program.push(`const jobs = []`)
+  program.push(`function startJobs() {`)
+
+  if (jobFiles.length > 0) {
+      imports.push(`import { Cron } from "croner"`)
+
+      for (const file of jobFiles) {
+        const relativePath = path.relative(basePath, file).replace(/\\/g, "/")
+        const displayName = path.relative(jobsDir, file).replace(/\\/g, "/").replace("/job.ts", "")
+        const alias = relativePath.replace(/[^a-zA-Z0-9]/g, "_") + "Job"
+        imports.push(`import * as ${alias} from "../${relativePath}";`)
+
+        program.push(`  for (const schedule of ${alias}.schedule) {`)
+        program.push(`    const job = new Cron(schedule, { protect: true }, () => {`)
+        program.push(`      try {`)
+        program.push(`        ${alias}.runJob()`)
+        program.push(`      } catch (error) {`)
+        program.push(`        console.error("Error running job ${colors.red(displayName)}:", error)`)
+        program.push(`      }`)
+        program.push(`    })`)
+        program.push(`    jobs.push(job)`)
+        program.push(`    console.log(\`     ${colors.green("✓")} Scheduling job ${colors.green(displayName)} with schedule: \${schedule}\`)`)
+        program.push(`  }`)
+
+      }
+  }
+  program.push(`}`)
+  return program.join("\n");
+}
+
 function generateBackendServerCode(apiRouter: RouteNode<string>, headStacks: Map<string, { headStack: string[], html: string }>, pageRouter: RouteNode<string>, basePath: string): string {
   const imports: string[] = []
   const htmlConstants: string[] = []
   const routerCalls: string[] = []
 
   imports.push(`import { Router, HttpServer, addAssetRoutesForFolder, executeMiddlewareChain } from "@peaque/framework/server"`)
-  imports.push(`import { JobsRunner } from "@peaque/framework/server"`)
 
   // Generate HTML content constants
   for (const [stackKey, { html }] of headStacks) {
@@ -382,6 +417,10 @@ function generateBackendServerCode(apiRouter: RouteNode<string>, headStacks: Map
   routerFunction.push("  return router")
   routerFunction.push("}")
 
+  const jobsFunction = buildJobsFunction(basePath, imports)
+
+  const niceDateForPresentationInShortForm = new Date().toISOString().replace("T", " ").replace("Z", "").substring(0, 19)
+
   // Generate main startup function
   const startupFunction = [
     "async function main() {",
@@ -393,20 +432,18 @@ function generateBackendServerCode(apiRouter: RouteNode<string>, headStacks: Map
       ? "  const handler = async (req) => { await executeMiddlewareChain(req, [AbsoluteRootMiddleware], router.getRequestHandler()) }"
       : "  const handler = router.getRequestHandler()",
     "  const server = new HttpServer(handler)",
-    "  const jobsRunner = new JobsRunner(process.cwd())",
-    "  await jobsRunner.startOrUpdateJobs()",
     "  server.startServer(port)",
     `  console.log("🌍  ${colors.bold(colors.yellow("Peaque Framework " + platformVersion))} production server")`,
+    `  console.log("     ${colors.green("✓")} Server built on ${colors.gray(niceDateForPresentationInShortForm)}")`,
+    "  await startJobs()",
     `  console.log("     ${colors.green("✓")} Listening on port " + port)`,
     `  console.log("     ${colors.green("✓")} Process id " + process.pid)`,
     `  console.log("     ${colors.green("✓")} Happy browsing!")`,
     "  process.on('SIGINT', () => {",
-    "    jobsRunner.stop()",
     "    server.stop()",
     "    process.exit(0)",
     "  })",
     "  process.on('SIGTERM', () => {",
-    "    jobsRunner.stop()",
     "    server.stop()",
     "    process.exit(0)",
     "  })",
@@ -414,14 +451,16 @@ function generateBackendServerCode(apiRouter: RouteNode<string>, headStacks: Map
     "main()",
   ]
 
-  return [...imports, "", ...htmlConstants, "", ...routerFunction, "", ...startupFunction].join("\n")
+  return [...imports, "", ...htmlConstants, "", jobsFunction, ...routerFunction, "", ...startupFunction].join("\n")
 }
 
-export const buildForProduction = async (basePath: string) => {
+export const buildForProduction = async (basePath: string, distFolder: string) => {
   const startTime = Date.now()
   console.log(`📦  ${colors.bold(colors.yellow("Peaque Framework " + platformVersion))} building for production`)
   console.log(`     ${colors.green("✓")} Base path ${colors.gray(`${basePath}`)}`)
-  const outDir = path.join(basePath, "dist")
+  console.log(`     ${colors.green("✓")} Output path ${colors.gray(`${distFolder}`)}`)
+  const outDir = distFolder
+  const theoreticalDistFolder = path.join(basePath, "dist")
   const assetDir = path.join(outDir, "assets")
   fs.mkdirSync(assetDir, { recursive: true })
 
@@ -433,7 +472,7 @@ export const buildForProduction = async (basePath: string) => {
   // Bundle frontend
   const jsBundler = new FrontendBundler({
     entryContent: frontendJs,
-    baseDir: outDir,
+    baseDir: theoreticalDistFolder,
     sourcemap: false,
     writeToFile: true,
     outputFile: path.join(assetDir, "peaque.js"),
@@ -475,24 +514,31 @@ export const buildForProduction = async (basePath: string) => {
   const backendCode = generateBackendServerCode(backend, headStacks, frontend, basePath)
 
   // Write backend code
-  fs.writeFileSync(path.join(outDir, "server_without_env.js"), backendCode, "utf-8")
+  await bundleBackendProgram({
+    baseDir: theoreticalDistFolder,
+    outfile: path.join(outDir, "server_without_env.cjs"),
+    inputContent: backendCode,
+    minify: false,
+    sourcemap: false,
+  })
 
   // Create main.js with env loading
+  const pathToOutputFromTheoretical = path.relative(theoreticalDistFolder, outDir).replace(/\\/g, "/")
   const mainJs = `import dotenv from "dotenv"
 const currentPath = process.cwd()
 dotenv.config({path: \`\${currentPath}/.env\`, override: true})
 dotenv.config()
-require("./server_without_env.js")
-`
+require("${pathToOutputFromTheoretical == "" ? "." : pathToOutputFromTheoretical}/server_without_env.cjs")`
+
   await bundleBackendProgram({
-    baseDir: outDir,
+    baseDir: theoreticalDistFolder,
     outfile: path.join(outDir, "main.cjs"),
     inputContent: mainJs,
-    minify: true,
+    minify: false,
     sourcemap: false,
   })
 
-  fs.unlinkSync(path.join(outDir, "server_without_env.js"))
+  fs.unlinkSync(path.join(outDir, "server_without_env.cjs"))
 
   const endTime = Date.now()
   console.log(`     ${colors.green("✓")} Production build completed ${colors.bold(colors.green("successfully"))} in ${((endTime - startTime) / 1000).toFixed(2)} seconds`)

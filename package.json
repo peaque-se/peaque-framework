@@ -1,6 +1,6 @@
 {
   "name": "@peaque/framework",
-  "version": "2.2.11",
+  "version": "2.2.12",
   "description": "The last javascript framework ever to be needed",
   "type": "module",
   "license": "MIT",
@@ -48,6 +48,7 @@
     "@tailwindcss/postcss": "^4.1.13",
     "autoprefixer": "^10.4.0",
     "chokidar": "^3.5.0",
+    "commander": "^14.0.1",
     "croner": "^9.1.0",
     "dotenv": "^16.3.1",
     "esbuild": "^0.25.10",
@@ -55,7 +56,11 @@
     "mime-types": "^2.1.0",
     "postcss": "^8.4.0",
     "ws": "^8.14.0",
-    "yoctocolors": "^2.1.2"
+    "yoctocolors": "^2.1.2",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-refresh": "^0.17.0",
+    "tailwindcss": "^4.1.13"
   },
   "devDependencies": {
     "@jest/globals": "^29.7.0",

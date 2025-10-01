@@ -14,7 +14,8 @@ function mapFrame(frame: NodeJS.CallSite): string {
   const line = frame.getLineNumber()
   const column = frame.getColumnNumber()
 
-  // no file -> no mapping, go
+  if (frame.isNative()) return "<native>"
+  if (frame.isEval()) return "<eval>"
   if (!file) return "<unknown>"
 
   const map = maps.get(file)
