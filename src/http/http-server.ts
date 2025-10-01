@@ -4,7 +4,6 @@ import { CookieJarImpl, PeaqueRequestImpl } from "./default-impl.js"
 import { parseRequestBody } from "./http-bodyparser.js"
 import { HttpMethod, PeaqueWebSocket, RequestHandler, WebSocketHandler } from "./http-types.js"
 import { InterruptFurtherProcessing } from "@peaque/framework"
-import { CustomHostNameNodeHandler } from "@peaque/framework/server/hostname-handlers"
 
 class DeferredPeaqueWebSocket implements PeaqueWebSocket {
   private ws?: WebSocket
@@ -133,11 +132,6 @@ export class HttpServer {
 
   async startServer(port: number): Promise<void> {
     this.server = http.createServer(async (req: http.IncomingMessage, res: http.ServerResponse) => {
-      const hostHandler = CustomHostNameNodeHandler[req.headers.host || ""]
-      if (hostHandler) {
-        return await hostHandler(req, res)
-      }
-
       const url = req.url || "/"
       const requestPath = url.split("?")[0]
       // Parse query parameters from URL

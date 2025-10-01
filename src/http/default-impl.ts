@@ -1,4 +1,5 @@
 import type { CookieJar, CookieOptions, HttpMethod, PeaqueRequest, PeaqueWebSocket, WebSocketHandler } from "./http-types.js";
+import { proxyRequest } from "./request-proxy.js";
 
 // Implementation of a simple CookieJar to manage cookies in requests and responses
 export class CookieJarImpl implements CookieJar {
@@ -220,6 +221,45 @@ export class PeaqueRequestImpl implements PeaqueRequest {
     return this.sendData;
   }
 
+  queryString(): string {
+    if (this.queryData == null || Object.keys(this.queryData).length === 0) {
+      return '';
+    }
+    const query = Object.entries(this.queryData).map(([key, value]) => {
+      if (Array.isArray(value)) {
+        return value.map(v => `${encodeURIComponent(key)}=${encodeURIComponent(v)}`).join('&');
+      }
+      return `${encodeURIComponent(key)}=${encodeURIComponent(value)}`;
+    }).join('&');
+    return query ? `?${query}` : '';
+  }
+
+  async proxyTo(url: string): Promise<void> {
+    const response = await proxyRequest(url, {
+      method: this.method(),
+      headers: this.requestHeadersData,
+      body: this.rawBodyData,
+      clientIp: this.ipData,
+    });
+
+    // Apply the response
+    this.code(response.statusCode);
+
+    // Copy all response headers
+    response.headers.forEach((value, name) => {
+      this.header(name, value);
+    });
+
+    // Set content type if present
+    const contentType = response.headers.get('content-type');
+    if (contentType) {
+      this.type(contentType);
+    }
+
+    this.sendData = response.body;
+    this.responded = true;
+  }
+    
   // WebSocket upgrade support (not implemented in this basic request implementation)
   isUpgradeRequest(): boolean {
     return false; // This implementation doesn't support WebSocket upgrades

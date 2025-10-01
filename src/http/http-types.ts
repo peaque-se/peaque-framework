@@ -19,10 +19,12 @@ export interface PeaqueRequest {
   pathParam(name: string): string | undefined // path param only, first value
   setPathParam(name: string, value: string): void // set path param value
   queryParam(name: string): string | undefined // query param only, first value
+  queryString(): string // full query string, e.g. ?a=1&b=2
   setQueryParam(name: string, value: string[]): void // set query param value
   queryParamValues(name: string): string[] | undefined // query param only, all values
   requestHeader(name: string): string | undefined // header only
   requestHeaderValues(name: string): string[] | undefined // all header values
+  proxyTo(url: string): Promise<void> // proxy request to another URL
   method(): HttpMethod
   originalUrl(): string
   ip(): string

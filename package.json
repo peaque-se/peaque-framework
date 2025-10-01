@@ -1,6 +1,6 @@
 {
   "name": "@peaque/framework",
-  "version": "2.2.13",
+  "version": "2.2.14",
   "description": "The last javascript framework ever to be needed",
   "type": "module",
   "license": "MIT",
@@ -12,16 +12,7 @@
     "./server": {
       "import": "./dist/http/index.js",
       "types": "./dist/http/index.d.ts"
-    },
-    "./server/hostname-handlers": {
-      "import": "./dist/http/hostname-handlers/index.js",
-      "types": "./dist/http/hostname-handlers/index.d.ts"
     }
-  },
-  "imports": {
-    "#@peaque/framework": "./src/index.ts",
-    "#@peaque/framework/http": "./src/http/index.ts",
-    "#@peaque/framework/http/hostname-handlers": "./src/http/hostname-handlers/index.ts"
   },
   "bin": {
     "peaque": "./dist/cli/main.js"

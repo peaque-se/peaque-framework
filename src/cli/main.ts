@@ -16,7 +16,7 @@ program
   .description("Start development server")
   .option("-p, --port <port>", "change the port for the development server", "3000")
   .option("-b, --base <path>", "load project from other base path (default: current directory)")
-  .option("-n, --no-strict", "disable react strict mode", false)
+  .option("-n, --no-strict", "disable react strict mode", true)
   .action(function () {
     const path = this.opts().base || process.cwd()
     const devServer = new DevServer(path, this.opts().port, !this.opts().strict)

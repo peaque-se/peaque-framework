@@ -5,6 +5,7 @@
     "lib": ["ES2020", "DOM"],
     "allowImportingTsExtensions": false,
     "outDir": "./dist",
+    "rootDir": "./src",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -17,12 +18,7 @@
     "moduleResolution": "NodeNext",
     "isolatedModules": true,
     "types": ["node"],
-    "jsx": "react-jsx",
-    "paths": {
-      "@peaque/framework": ["./src/index.ts"],
-      "@peaque/framework/server": ["./src/http/index.ts"],
-      "@peaque/framework/server/hostname-handlers": ["./src/http/hostname-handlers/index.ts"]
-    }
+    "jsx": "react-jsx"
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "test"]
