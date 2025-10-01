@@ -136,7 +136,7 @@ export async function bundleESMModule(moduleName: string, moduleBaseName: string
 /// Finds the correct module name in node_modules, handling scoped packages and sub-paths
 /// For example, for moduleName = "@scope/package/sub/path", it will check for
 /// "@scope/package", then "@scope", and finally "package" until it finds a package.json
-function findModuleName(moduleName: string, basePath: string): string {
+function findModuleName(moduleName: string, basePath: string): string | null {
   if (moduleName.includes("/")) {
     const parts = moduleName.split("/")
     for (let i = parts.length; i > 0; i--) {
@@ -145,28 +145,50 @@ function findModuleName(moduleName: string, basePath: string): string {
         return attempt
       }
     }
-    throw new Error(`Could not find any package.json in node_modules for '${moduleName}'`)
+    return null
   }
-  return moduleName
+  return fs.existsSync(path.join(basePath, "node_modules", moduleName, "package.json")) ? moduleName : null
 }
 
 /// Sets the base dependencies from the package.json in the given basePath
 /// This is used to avoid bundling dependencies that are already available in the environment
 export function setBaseDependencies(basePath: string) {
-  const pkgPath = path.join(basePath, "package.json")
-  if (!fs.existsSync(pkgPath)) {
-    throw new Error(`No package.json found in the current directory: ${basePath}`)
+  if (true) {
+    const pkgPath = path.join(basePath, "package.json")
+    if (!fs.existsSync(pkgPath)) {
+      throw new Error(`No package.json found in the current directory: ${basePath}`)
+    }
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8")) as PackageJson
+    const deps = Object.keys(pkg.dependencies || {})
+    dependencies.push(...deps)
   }
-  const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8")) as PackageJson
-  const deps = Object.keys(pkg.dependencies || {})
-  dependencies.push(...deps)
+
+  // also exclude any dependencies that @peaque/framework depends on
+  const frameworkPkgPath = path.join(basePath, "node_modules", "@peaque", "framework", "package.json")
+  if (fs.existsSync(frameworkPkgPath)) {
+    const frameworkPkg = JSON.parse(fs.readFileSync(frameworkPkgPath, "utf-8")) as PackageJson
+    const frameworkDeps = Object.keys(frameworkPkg.dependencies || {})
+    const ownDeps = frameworkDeps.filter((d) => !dependencies.includes(d))
+    dependencies.push(...ownDeps)
+  } else {
+    console.warn(`Warning: Could not find @peaque/framework package.json in ${frameworkPkgPath}. Make sure @peaque/framework is installed.`)
+  }
 }
 
 // Bundles a module from node_modules, handling both CommonJS and ESM modules
 // It first determines the module type by checking the package.json
 // Then it calls the appropriate bundling function
 export async function bundleModuleFromNodeModules(moduleName: string, basePath: string): Promise<string> {
-  const moduleBaseName = findModuleName(moduleName, basePath)
+  // try to load it from node_modules/@peaque/framework if not found
+  let moduleBaseName = findModuleName(moduleName, basePath)
+  if (!moduleBaseName) {
+    moduleBaseName = findModuleName(moduleName, path.join(basePath, "node_modules", "@peaque", "framework"))
+    if (!moduleBaseName) {
+      throw new Error(`Module ${moduleName} not found in node_modules or node_modules/@peaque/framework`)
+    } else {
+      basePath = path.join(basePath, "node_modules", "@peaque", "framework")
+    }
+  }
 
   const pkgJsonPath = path.join(basePath, "node_modules", moduleBaseName, "package.json")
   const pkgJson = JSON.parse(fs.readFileSync(pkgJsonPath, "utf-8")) as PackageJson

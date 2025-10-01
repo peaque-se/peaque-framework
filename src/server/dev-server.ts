@@ -107,6 +107,13 @@ function safeBuildRouter(dirPath: string, config: RouteFileConfig[]): RouteNode<
   return { staticChildren: new Map(), names: {}, stacks: {}, accept: false }
 }
 
+export interface DevServerOptions {
+  basePath: string
+  port: number
+  noStrict: boolean
+  fullStackTrace?: boolean
+}
+
 /// fifteenth attempt at a dev server that reloads even better, but is still fast
 export class DevServer {
   private basePath: string
@@ -126,7 +133,7 @@ export class DevServer {
   private errorPage: string | null = null
   private accessDeniedPage: string | null = null
 
-  constructor(basePath: string, port: number, noStrict: boolean) {
+  constructor({ basePath, port, noStrict, fullStackTrace = false }: DevServerOptions) {
     this.basePath = basePath
     this.port = port
     this.noStrict = noStrict
@@ -160,7 +167,9 @@ export class DevServer {
 
     setBaseDependencies(basePath)
 
-    setupSourceMaps()
+    if (!fullStackTrace) {
+      setupSourceMaps()
+    }
 
     if (existsSync(path.join(basePath, "src/middleware.ts"))) {
       this.moduleLoader

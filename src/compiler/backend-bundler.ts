@@ -1,5 +1,6 @@
 import * as esbuild from "esbuild"
 import { OnResolveArgs, OnResolveResult, Plugin, PluginBuild } from "esbuild"
+import { createRequire } from "module"
 import path from "path"
 import { fileURLToPath } from "url"
 export interface BackendBundleOptions {
@@ -28,18 +29,23 @@ export interface BackendBundleResult {
   metafile?: esbuild.Metafile
 }
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const frameworkRequire = createRequire(import.meta.url)
+const frameworkResolve = frameworkRequire.resolve
 
 export function frameworkDepsPlugin(deps: string[]): Plugin {
   return {
     name: "framework-deps",
     setup: function (build: PluginBuild) {
       build.onResolve({ filter: /.*/ }, (args: OnResolveArgs): OnResolveResult | null => {
-        if (!deps.includes(args.path)) return null
-        try {
-          const resolved = require.resolve(args.path, { paths: [__dirname] })
-          return { path: resolved }
-        } catch {
+        if (deps.some(d => args.path === d || args.path.startsWith(d + "/"))) {
+          try {
+            const resolved = frameworkResolve(args.path)
+            return { path: resolved }
+          } catch(e) {
+            console.warn("Failed to resolve framework dependency:", args.path, e instanceof Error ? e.message : e)
+            return null
+          }
+        } else {
           return null
         }
       })

@@ -17,9 +17,16 @@ program
   .option("-p, --port <port>", "change the port for the development server", "3000")
   .option("-b, --base <path>", "load project from other base path (default: current directory)")
   .option("-n, --no-strict", "disable react strict mode", true)
+  .option("--full-stack-traces", "enable full stack traces")
   .action(function () {
     const path = this.opts().base || process.cwd()
-    const devServer = new DevServer(path, this.opts().port, !this.opts().strict)
+    const options = {
+      basePath: path,
+      port: parseInt(this.opts().port || "3000", 10),
+      noStrict: this.opts().noStrict,
+      fullStackTrace: this.opts().fullStackTraces || false
+    }
+    const devServer = new DevServer(options)
     devServer.start()
     process.on("SIGINT", () => {
       devServer.stop("SIGINT")
