@@ -37,6 +37,10 @@ function mapFrame(frame: NodeJS.CallSite): string {
   return `${file}:${line}:${column}`
 }
 
+function shouldExclude(line: string): boolean {
+  return line.includes("/peaque-framework/") || line.includes("@peaque/framework")
+}
+
 export function setupSourceMaps() {
   Error.prepareStackTrace = (err, structuredStackTrace) => {
     const stackTrace: string[] = []
@@ -44,19 +48,19 @@ export function setupSourceMaps() {
     for (const frame of structuredStackTrace) {
       const functionName = frame.getFunctionName() || "<anonymous>"
       const needle = mapFrame(frame)
-      if (needle.includes("/peaque-framework/")) {
-        stackTrace.push(`    at ${colors.gray("<@peaque-framework>")}`)
+      if (shouldExclude(needle)) {
+        stackTrace.push(`    at ${colors.gray("<@peaque/framework>")}`)
         continue
       }
       stackTrace.push(`    at ${colors.bold(functionName)} (${colors.gray(needle)})`)
     }
 
     // from the back of the stack, remove all lines that are from node:
-    while (stackTrace.length > 0 && (stackTrace[stackTrace.length - 1].includes("node:") || stackTrace[stackTrace.length - 1].includes("/peaque-framework/"))) {
+    while (stackTrace.length > 0 && (stackTrace[stackTrace.length - 1].includes("node:") || shouldExclude(stackTrace[stackTrace.length - 1]))) {
       stackTrace.pop()
     }
 
-    stackTrace.push(`    at ${colors.gray("<@peaque-framework>")}`)
+    stackTrace.push(`    at ${colors.gray("<@peaque/framework>")}`)
 
     // fold all duplicate lines into one
     const uniqueStack: string[] = []

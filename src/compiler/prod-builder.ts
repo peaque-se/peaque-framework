@@ -338,7 +338,8 @@ function generateBackendServerCode(apiRouter: RouteNode<string>, headStacks: Map
     }
 
     for (const [key, child] of node.staticChildren.entries()) {
-      generateApiRouteRegistrations(child, currentPath + "/" + key)
+      const nextPath = child.excludeFromPath ? currentPath : currentPath + "/" + key
+      generateApiRouteRegistrations(child, nextPath)
     }
     if (node.paramChild) {
       generateApiRouteRegistrations(node.paramChild, currentPath + "/:" + node.paramChild.paramName)
@@ -363,7 +364,8 @@ function generateBackendServerCode(apiRouter: RouteNode<string>, headStacks: Map
     }
 
     for (const [key, child] of node.staticChildren.entries()) {
-      generatePageRouteRegistrations(child, currentPath + "/" + key, heads)
+      const nextPath = child.excludeFromPath ? currentPath : currentPath + "/" + key
+      generatePageRouteRegistrations(child, nextPath, heads)
     }
     if (node.paramChild) {
       generatePageRouteRegistrations(node.paramChild, currentPath + "/:" + node.paramChild.paramName, heads)
@@ -490,7 +492,7 @@ require("./server_without_env.js")
     sourcemap: false,
   })
 
-  fs.unlinkSync(path.join(outDir, "server_without_env.js"))
+  //fs.unlinkSync(path.join(outDir, "server_without_env.js"))
 
   const endTime = Date.now()
   console.log(`     ${colors.green("✓")} Production build completed ${colors.bold(colors.green("successfully"))} in ${((endTime - startTime) / 1000).toFixed(2)} seconds`)
