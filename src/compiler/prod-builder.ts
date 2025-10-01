@@ -540,6 +540,19 @@ require("${pathToOutputFromTheoretical == "" ? "." : pathToOutputFromTheoretical
 
   fs.unlinkSync(path.join(outDir, "server_without_env.cjs"))
 
+  // experimental: check if the baseDir/node_modules/.prisma exists, if so copy the whole baseDir/node_modules/.prisma/ to dist/node_modules/.prisma
+  try {
+    const prismaDir = path.join(basePath, "node_modules", ".prisma")
+    if (fs.existsSync(prismaDir)) {
+      const targetPrismaDir = path.join(outDir, "node_modules", ".prisma")
+      fs.mkdirSync(path.join(outDir, "node_modules"), { recursive: true })
+      await fs.promises.cp(prismaDir, targetPrismaDir, { recursive: true })
+      console.log(`     ${colors.green("✓")} [prisma-plugin] Copied Prisma client files to ${colors.gray(targetPrismaDir)}`)
+    }
+  } catch (error) {
+    console.error("Error checking for Prisma:", error)
+  }
+
   const endTime = Date.now()
   console.log(`     ${colors.green("✓")} Production build completed ${colors.bold(colors.green("successfully"))} in ${((endTime - startTime) / 1000).toFixed(2)} seconds`)
 
