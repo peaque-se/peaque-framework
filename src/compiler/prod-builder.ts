@@ -492,7 +492,7 @@ require("./server_without_env.js")
     sourcemap: false,
   })
 
-  //fs.unlinkSync(path.join(outDir, "server_without_env.js"))
+  fs.unlinkSync(path.join(outDir, "server_without_env.js"))
 
   const endTime = Date.now()
   console.log(`     ${colors.green("✓")} Production build completed ${colors.bold(colors.green("successfully"))} in ${((endTime - startTime) / 1000).toFixed(2)} seconds`)
