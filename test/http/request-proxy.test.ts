@@ -1,5 +1,5 @@
-import { proxyRequest, type FetchFunction } from '../../src/http/request-proxy.js';
-import { createMockFetch } from './request-proxy.test-helpers.js';
+import { proxyRequest } from '../../src/http/request-proxy.js';
+import { createMockHttpClient } from './request-proxy.test-helpers.js';
 
 // ============================================================================
 // Tests: Host Header Replacement
@@ -7,7 +7,7 @@ import { createMockFetch } from './request-proxy.test-helpers.js';
 
 describe('proxyRequest - Host Header Replacement', () => {
   it('should replace Host header with target host', async () => {
-    const { mockFetch, capturedRequest } = createMockFetch({
+    const { mockClient, capturedRequest } = createMockHttpClient({
       status: 200,
       body: 'OK',
     });
@@ -22,7 +22,7 @@ describe('proxyRequest - Host Header Replacement', () => {
         },
         clientIp: '192.168.1.1',
       },
-      mockFetch
+      mockClient
     );
 
     expect(capturedRequest.headers['host']).toBe('target.example.com');
@@ -30,7 +30,7 @@ describe('proxyRequest - Host Header Replacement', () => {
   });
 
   it('should handle target with port in Host header', async () => {
-    const { mockFetch, capturedRequest } = createMockFetch({
+    const { mockClient, capturedRequest } = createMockHttpClient({
       status: 200,
       body: 'OK',
     });
@@ -42,14 +42,14 @@ describe('proxyRequest - Host Header Replacement', () => {
         headers: { host: 'original.example.com:3000' },
         clientIp: '192.168.1.1',
       },
-      mockFetch
+      mockClient
     );
 
     expect(capturedRequest.headers['host']).toBe('target.example.com:8080');
   });
 
   it('should handle IPv6 addresses in Host header', async () => {
-    const { mockFetch, capturedRequest } = createMockFetch({
+    const { mockClient, capturedRequest } = createMockHttpClient({
       status: 200,
       body: 'OK',
     });
@@ -61,7 +61,7 @@ describe('proxyRequest - Host Header Replacement', () => {
         headers: { host: '[::1]:3000' },
         clientIp: '192.168.1.1',
       },
-      mockFetch
+      mockClient
     );
 
     expect(capturedRequest.headers['host']).toBe('[2001:db8::1]:8080');
@@ -69,7 +69,7 @@ describe('proxyRequest - Host Header Replacement', () => {
   });
 
   it('should handle hostnames with special characters', async () => {
-    const { mockFetch, capturedRequest } = createMockFetch({
+    const { mockClient, capturedRequest } = createMockHttpClient({
       status: 200,
       body: 'OK',
     });
@@ -81,7 +81,7 @@ describe('proxyRequest - Host Header Replacement', () => {
         headers: { host: 'original_domain.test' },
         clientIp: '192.168.1.1',
       },
-      mockFetch
+      mockClient
     );
 
     expect(capturedRequest.headers['host']).toBe('target-domain.co.uk');
@@ -89,7 +89,7 @@ describe('proxyRequest - Host Header Replacement', () => {
   });
 
   it('should handle empty host header', async () => {
-    const { mockFetch, capturedRequest } = createMockFetch({
+    const { mockClient, capturedRequest } = createMockHttpClient({
       status: 200,
       body: 'OK',
     });
@@ -101,7 +101,7 @@ describe('proxyRequest - Host Header Replacement', () => {
         headers: { host: '' },
         clientIp: '192.168.1.1',
       },
-      mockFetch
+      mockClient
     );
 
     expect(capturedRequest.headers['host']).toBe('target.com');
@@ -115,7 +115,7 @@ describe('proxyRequest - Host Header Replacement', () => {
 
 describe('proxyRequest - X-Forwarded-* Headers', () => {
   it('should add X-Forwarded-For header with client IP', async () => {
-    const { mockFetch, capturedRequest } = createMockFetch({
+    const { mockClient, capturedRequest } = createMockHttpClient({
       status: 200,
       body: 'OK',
     });
@@ -127,14 +127,14 @@ describe('proxyRequest - X-Forwarded-* Headers', () => {
         headers: { host: 'original.com' },
         clientIp: '203.0.113.42',
       },
-      mockFetch
+      mockClient
     );
 
     expect(capturedRequest.headers['x-forwarded-for']).toBe('203.0.113.42');
   });
 
   it('should append to existing X-Forwarded-For header', async () => {
-    const { mockFetch, capturedRequest } = createMockFetch({
+    const { mockClient, capturedRequest } = createMockHttpClient({
       status: 200,
       body: 'OK',
     });
@@ -149,7 +149,7 @@ describe('proxyRequest - X-Forwarded-* Headers', () => {
         },
         clientIp: '203.0.113.42',
       },
-      mockFetch
+      mockClient
     );
 
     expect(capturedRequest.headers['x-forwarded-for']).toBe(
@@ -158,7 +158,7 @@ describe('proxyRequest - X-Forwarded-* Headers', () => {
   });
 
   it('should add X-Forwarded-Host header with original host', async () => {
-    const { mockFetch, capturedRequest } = createMockFetch({
+    const { mockClient, capturedRequest } = createMockHttpClient({
       status: 200,
       body: 'OK',
     });
@@ -170,14 +170,14 @@ describe('proxyRequest - X-Forwarded-* Headers', () => {
         headers: { host: 'original.example.com:3000' },
         clientIp: '192.168.1.1',
       },
-      mockFetch
+      mockClient
     );
 
     expect(capturedRequest.headers['x-forwarded-host']).toBe('original.example.com:3000');
   });
 
   it('should handle array value for host header in X-Forwarded-Host', async () => {
-    const { mockFetch, capturedRequest } = createMockFetch({
+    const { mockClient, capturedRequest } = createMockHttpClient({
       status: 200,
       body: 'OK',
     });
@@ -189,14 +189,14 @@ describe('proxyRequest - X-Forwarded-* Headers', () => {
         headers: { host: ['host1.com', 'host2.com'] },
         clientIp: '192.168.1.1',
       },
-      mockFetch
+      mockClient
     );
 
     expect(capturedRequest.headers['x-forwarded-host']).toBe('host1.com');
   });
 
   it('should add X-Forwarded-Proto as http by default', async () => {
-    const { mockFetch, capturedRequest } = createMockFetch({
+    const { mockClient, capturedRequest } = createMockHttpClient({
       status: 200,
       body: 'OK',
     });
@@ -208,14 +208,14 @@ describe('proxyRequest - X-Forwarded-* Headers', () => {
         headers: { host: 'original.com' },
         clientIp: '192.168.1.1',
       },
-      mockFetch
+      mockClient
     );
 
     expect(capturedRequest.headers['x-forwarded-proto']).toBe('http');
   });
 
   it('should detect HTTPS from x-forwarded-ssl header', async () => {
-    const { mockFetch, capturedRequest } = createMockFetch({
+    const { mockClient, capturedRequest } = createMockHttpClient({
       status: 200,
       body: 'OK',
     });
@@ -230,14 +230,14 @@ describe('proxyRequest - X-Forwarded-* Headers', () => {
         },
         clientIp: '192.168.1.1',
       },
-      mockFetch
+      mockClient
     );
 
     expect(capturedRequest.headers['x-forwarded-proto']).toBe('https');
   });
 
   it('should detect HTTPS from x-forwarded-scheme header', async () => {
-    const { mockFetch, capturedRequest } = createMockFetch({
+    const { mockClient, capturedRequest } = createMockHttpClient({
       status: 200,
       body: 'OK',
     });
@@ -252,14 +252,14 @@ describe('proxyRequest - X-Forwarded-* Headers', () => {
         },
         clientIp: '192.168.1.1',
       },
-      mockFetch
+      mockClient
     );
 
     expect(capturedRequest.headers['x-forwarded-proto']).toBe('https');
   });
 
   it('should preserve existing X-Forwarded-Proto header', async () => {
-    const { mockFetch, capturedRequest } = createMockFetch({
+    const { mockClient, capturedRequest } = createMockHttpClient({
       status: 200,
       body: 'OK',
     });
@@ -274,14 +274,14 @@ describe('proxyRequest - X-Forwarded-* Headers', () => {
         },
         clientIp: '192.168.1.1',
       },
-      mockFetch
+      mockClient
     );
 
     expect(capturedRequest.headers['x-forwarded-proto']).toBe('https');
   });
 
   it('should preserve non-standard X-Forwarded-Proto values', async () => {
-    const { mockFetch, capturedRequest } = createMockFetch({
+    const { mockClient, capturedRequest } = createMockHttpClient({
       status: 200,
       body: 'OK',
     });
@@ -296,14 +296,14 @@ describe('proxyRequest - X-Forwarded-* Headers', () => {
         },
         clientIp: '192.168.1.1',
       },
-      mockFetch
+      mockClient
     );
 
     expect(capturedRequest.headers['x-forwarded-proto']).toBe('ws');
   });
 
   it('should prioritize x-forwarded-ssl over conflicting x-forwarded-scheme', async () => {
-    const { mockFetch, capturedRequest } = createMockFetch({
+    const { mockClient, capturedRequest } = createMockHttpClient({
       status: 200,
       body: 'OK',
     });
@@ -319,14 +319,14 @@ describe('proxyRequest - X-Forwarded-* Headers', () => {
         },
         clientIp: '192.168.1.1',
       },
-      mockFetch
+      mockClient
     );
 
     expect(capturedRequest.headers['x-forwarded-proto']).toBe('https');
   });
 
   it('should handle case-insensitive x-forwarded-ssl detection', async () => {
-    const { mockFetch, capturedRequest } = createMockFetch({
+    const { mockClient, capturedRequest } = createMockHttpClient({
       status: 200,
       body: 'OK',
     });
@@ -341,14 +341,14 @@ describe('proxyRequest - X-Forwarded-* Headers', () => {
         },
         clientIp: '192.168.1.1',
       },
-      mockFetch
+      mockClient
     );
 
     expect(capturedRequest.headers['x-forwarded-proto']).toBe('https');
   });
 
   it('should handle case-insensitive x-forwarded-scheme detection', async () => {
-    const { mockFetch, capturedRequest } = createMockFetch({
+    const { mockClient, capturedRequest } = createMockHttpClient({
       status: 200,
       body: 'OK',
     });
@@ -363,14 +363,14 @@ describe('proxyRequest - X-Forwarded-* Headers', () => {
         },
         clientIp: '192.168.1.1',
       },
-      mockFetch
+      mockClient
     );
 
     expect(capturedRequest.headers['x-forwarded-proto']).toBe('https');
   });
 
   it('should handle IPv6 client IP addresses', async () => {
-    const { mockFetch, capturedRequest } = createMockFetch({
+    const { mockClient, capturedRequest } = createMockHttpClient({
       status: 200,
       body: 'OK',
     });
@@ -382,14 +382,14 @@ describe('proxyRequest - X-Forwarded-* Headers', () => {
         headers: { host: 'original.com' },
         clientIp: '2001:db8::1',
       },
-      mockFetch
+      mockClient
     );
 
     expect(capturedRequest.headers['x-forwarded-for']).toBe('2001:db8::1');
   });
 
   it('should handle IPv6 client IP with brackets', async () => {
-    const { mockFetch, capturedRequest } = createMockFetch({
+    const { mockClient, capturedRequest } = createMockHttpClient({
       status: 200,
       body: 'OK',
     });
@@ -401,14 +401,14 @@ describe('proxyRequest - X-Forwarded-* Headers', () => {
         headers: { host: 'original.com' },
         clientIp: '[::1]',
       },
-      mockFetch
+      mockClient
     );
 
     expect(capturedRequest.headers['x-forwarded-for']).toBe('[::1]');
   });
 
   it('should handle empty client IP', async () => {
-    const { mockFetch, capturedRequest } = createMockFetch({
+    const { mockClient, capturedRequest } = createMockHttpClient({
       status: 200,
       body: 'OK',
     });
@@ -420,7 +420,7 @@ describe('proxyRequest - X-Forwarded-* Headers', () => {
         headers: { host: 'original.com' },
         clientIp: '',
       },
-      mockFetch
+      mockClient
     );
 
     expect(capturedRequest.headers['x-forwarded-for']).toBe('');
@@ -433,7 +433,7 @@ describe('proxyRequest - X-Forwarded-* Headers', () => {
 
 describe('proxyRequest - Request Headers Preservation', () => {
   it('should preserve all request headers except Host', async () => {
-    const { mockFetch, capturedRequest } = createMockFetch({
+    const { mockClient, capturedRequest } = createMockHttpClient({
       status: 200,
       body: 'OK',
     });
@@ -451,7 +451,7 @@ describe('proxyRequest - Request Headers Preservation', () => {
         },
         clientIp: '192.168.1.1',
       },
-      mockFetch
+      mockClient
     );
 
     expect(capturedRequest.headers['content-type']).toBe('application/json');
@@ -462,7 +462,7 @@ describe('proxyRequest - Request Headers Preservation', () => {
   });
 
   it('should convert array header values to comma-separated strings', async () => {
-    const { mockFetch, capturedRequest } = createMockFetch({
+    const { mockClient, capturedRequest } = createMockHttpClient({
       status: 200,
       body: 'OK',
     });
@@ -478,7 +478,7 @@ describe('proxyRequest - Request Headers Preservation', () => {
         },
         clientIp: '192.168.1.1',
       },
-      mockFetch
+      mockClient
     );
 
     expect(capturedRequest.headers['accept']).toBe('application/json, text/html');
@@ -492,7 +492,7 @@ describe('proxyRequest - Request Headers Preservation', () => {
 
 describe('proxyRequest - Request Body Forwarding', () => {
   it('should forward request body', async () => {
-    const { mockFetch, capturedRequest } = createMockFetch({
+    const { mockClient, capturedRequest } = createMockHttpClient({
       status: 200,
       body: 'OK',
     });
@@ -510,14 +510,14 @@ describe('proxyRequest - Request Body Forwarding', () => {
         body: requestBody,
         clientIp: '192.168.1.1',
       },
-      mockFetch
+      mockClient
     );
 
     expect(capturedRequest.body?.toString()).toBe('{"key": "value"}');
   });
 
   it('should handle empty request body', async () => {
-    const { mockFetch, capturedRequest } = createMockFetch({
+    const { mockClient, capturedRequest } = createMockHttpClient({
       status: 200,
       body: 'OK',
     });
@@ -529,14 +529,14 @@ describe('proxyRequest - Request Body Forwarding', () => {
         headers: { host: 'original.com' },
         clientIp: '192.168.1.1',
       },
-      mockFetch
+      mockClient
     );
 
     expect(capturedRequest.body).toBeUndefined();
   });
 
   it('should handle zero-length buffer body', async () => {
-    const { mockFetch, capturedRequest } = createMockFetch({
+    const { mockClient, capturedRequest } = createMockHttpClient({
       status: 200,
       body: 'OK',
     });
@@ -549,14 +549,14 @@ describe('proxyRequest - Request Body Forwarding', () => {
         body: Buffer.alloc(0),
         clientIp: '192.168.1.1',
       },
-      mockFetch
+      mockClient
     );
 
     expect(capturedRequest.body).toBeUndefined();
   });
 
   it('should forward binary request body', async () => {
-    const { mockFetch, capturedRequest } = createMockFetch({
+    const { mockClient, capturedRequest } = createMockHttpClient({
       status: 200,
       body: 'OK',
     });
@@ -574,14 +574,14 @@ describe('proxyRequest - Request Body Forwarding', () => {
         body: binaryData,
         clientIp: '192.168.1.1',
       },
-      mockFetch
+      mockClient
     );
 
     expect(capturedRequest.body).toEqual(binaryData);
   });
 
   it('should forward text request body', async () => {
-    const { mockFetch, capturedRequest } = createMockFetch({
+    const { mockClient, capturedRequest } = createMockHttpClient({
       status: 200,
       body: 'OK',
     });
@@ -599,14 +599,14 @@ describe('proxyRequest - Request Body Forwarding', () => {
         body: textData,
         clientIp: '192.168.1.1',
       },
-      mockFetch
+      mockClient
     );
 
     expect(capturedRequest.body?.toString()).toBe('Hello, World!');
   });
 
   it('should forward form data request body', async () => {
-    const { mockFetch, capturedRequest } = createMockFetch({
+    const { mockClient, capturedRequest } = createMockHttpClient({
       status: 200,
       body: 'OK',
     });
@@ -624,14 +624,14 @@ describe('proxyRequest - Request Body Forwarding', () => {
         body: formData,
         clientIp: '192.168.1.1',
       },
-      mockFetch
+      mockClient
     );
 
     expect(capturedRequest.body?.toString()).toBe('name=John&age=30');
   });
 
   it('should handle single-byte body', async () => {
-    const { mockFetch, capturedRequest } = createMockFetch({
+    const { mockClient, capturedRequest } = createMockHttpClient({
       status: 200,
       body: 'OK',
     });
@@ -646,7 +646,7 @@ describe('proxyRequest - Request Body Forwarding', () => {
         body: singleByte,
         clientIp: '192.168.1.1',
       },
-      mockFetch
+      mockClient
     );
 
     expect(capturedRequest.body).toEqual(singleByte);
@@ -659,7 +659,7 @@ describe('proxyRequest - Request Body Forwarding', () => {
 
 describe('proxyRequest - HTTP Methods', () => {
   it('should proxy GET requests', async () => {
-    const { mockFetch, capturedRequest } = createMockFetch({
+    const { mockClient, capturedRequest } = createMockHttpClient({
       status: 200,
       body: 'OK',
     });
@@ -671,14 +671,14 @@ describe('proxyRequest - HTTP Methods', () => {
         headers: { host: 'original.com' },
         clientIp: '192.168.1.1',
       },
-      mockFetch
+      mockClient
     );
 
     expect(capturedRequest.method).toBe('GET');
   });
 
   it('should proxy POST requests', async () => {
-    const { mockFetch, capturedRequest } = createMockFetch({
+    const { mockClient, capturedRequest } = createMockHttpClient({
       status: 201,
       body: 'Created',
     });
@@ -691,14 +691,14 @@ describe('proxyRequest - HTTP Methods', () => {
         body: Buffer.from('data'),
         clientIp: '192.168.1.1',
       },
-      mockFetch
+      mockClient
     );
 
     expect(capturedRequest.method).toBe('POST');
   });
 
   it('should proxy PUT requests', async () => {
-    const { mockFetch, capturedRequest } = createMockFetch({
+    const { mockClient, capturedRequest } = createMockHttpClient({
       status: 200,
       body: 'Updated',
     });
@@ -711,14 +711,14 @@ describe('proxyRequest - HTTP Methods', () => {
         body: Buffer.from('data'),
         clientIp: '192.168.1.1',
       },
-      mockFetch
+      mockClient
     );
 
     expect(capturedRequest.method).toBe('PUT');
   });
 
   it('should proxy DELETE requests', async () => {
-    const { mockFetch, capturedRequest } = createMockFetch({
+    const { mockClient, capturedRequest } = createMockHttpClient({
       status: 204,
       body: '',
     });
@@ -730,14 +730,14 @@ describe('proxyRequest - HTTP Methods', () => {
         headers: { host: 'original.com' },
         clientIp: '192.168.1.1',
       },
-      mockFetch
+      mockClient
     );
 
     expect(capturedRequest.method).toBe('DELETE');
   });
 
   it('should proxy PATCH requests', async () => {
-    const { mockFetch, capturedRequest } = createMockFetch({
+    const { mockClient, capturedRequest } = createMockHttpClient({
       status: 200,
       body: 'Patched',
     });
@@ -750,7 +750,7 @@ describe('proxyRequest - HTTP Methods', () => {
         body: Buffer.from('data'),
         clientIp: '192.168.1.1',
       },
-      mockFetch
+      mockClient
     );
 
     expect(capturedRequest.method).toBe('PATCH');
@@ -763,7 +763,7 @@ describe('proxyRequest - HTTP Methods', () => {
 
 describe('proxyRequest - Response Handling', () => {
   it('should return response status code', async () => {
-    const { mockFetch } = createMockFetch({
+    const { mockClient } = createMockHttpClient({
       status: 201,
       body: 'Created',
     });
@@ -776,14 +776,14 @@ describe('proxyRequest - Response Handling', () => {
         body: Buffer.from('data'),
         clientIp: '192.168.1.1',
       },
-      mockFetch
+      mockClient
     );
 
     expect(response.statusCode).toBe(201);
   });
 
   it('should return response headers', async () => {
-    const { mockFetch } = createMockFetch({
+    const { mockClient } = createMockHttpClient({
       status: 200,
       headers: {
         'content-type': 'application/json',
@@ -799,7 +799,7 @@ describe('proxyRequest - Response Handling', () => {
         headers: { host: 'original.com' },
         clientIp: '192.168.1.1',
       },
-      mockFetch
+      mockClient
     );
 
     expect(response.headers.get('content-type')).toBe('application/json');
@@ -807,7 +807,7 @@ describe('proxyRequest - Response Handling', () => {
   });
 
   it('should return response body', async () => {
-    const { mockFetch } = createMockFetch({
+    const { mockClient } = createMockHttpClient({
       status: 200,
       body: '{"success": true}',
     });
@@ -819,7 +819,7 @@ describe('proxyRequest - Response Handling', () => {
         headers: { host: 'original.com' },
         clientIp: '192.168.1.1',
       },
-      mockFetch
+      mockClient
     );
 
     expect(response.body.toString()).toBe('{"success": true}');
@@ -827,7 +827,7 @@ describe('proxyRequest - Response Handling', () => {
 
   it('should handle binary response body', async () => {
     const binaryResponse = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
-    const { mockFetch } = createMockFetch({
+    const { mockClient } = createMockHttpClient({
       status: 200,
       headers: { 'content-type': 'image/png' },
       body: binaryResponse,
@@ -840,14 +840,14 @@ describe('proxyRequest - Response Handling', () => {
         headers: { host: 'original.com' },
         clientIp: '192.168.1.1',
       },
-      mockFetch
+      mockClient
     );
 
     expect(response.body).toEqual(binaryResponse);
   });
 
   it('should handle empty response body', async () => {
-    const { mockFetch } = createMockFetch({
+    const { mockClient } = createMockHttpClient({
       status: 204,
       headers: { 'content-type': 'application/json' },
       body: '',
@@ -860,7 +860,7 @@ describe('proxyRequest - Response Handling', () => {
         headers: { host: 'original.com' },
         clientIp: '192.168.1.1',
       },
-      mockFetch
+      mockClient
     );
 
     expect(response.statusCode).toBe(204);
@@ -868,7 +868,7 @@ describe('proxyRequest - Response Handling', () => {
   });
 
   it('should handle response with no body headers', async () => {
-    const { mockFetch } = createMockFetch({
+    const { mockClient } = createMockHttpClient({
       status: 200,
       headers: {},
       body: 'OK',
@@ -881,7 +881,7 @@ describe('proxyRequest - Response Handling', () => {
         headers: { host: 'original.com' },
         clientIp: '192.168.1.1',
       },
-      mockFetch
+      mockClient
     );
 
     expect(response.statusCode).toBe(200);
@@ -890,7 +890,7 @@ describe('proxyRequest - Response Handling', () => {
   });
 
   it('should handle 1xx informational responses', async () => {
-    const { mockFetch } = createMockFetch({
+    const { mockClient } = createMockHttpClient({
       status: 100,
       body: '',
     });
@@ -902,14 +902,14 @@ describe('proxyRequest - Response Handling', () => {
         headers: { host: 'original.com' },
         clientIp: '192.168.1.1',
       },
-      mockFetch
+      mockClient
     );
 
     expect(response.statusCode).toBe(100);
   });
 
   it('should handle 5xx server error responses', async () => {
-    const { mockFetch } = createMockFetch({
+    const { mockClient } = createMockHttpClient({
       status: 503,
       headers: { 'retry-after': '60' },
       body: 'Service Unavailable',
@@ -922,7 +922,7 @@ describe('proxyRequest - Response Handling', () => {
         headers: { host: 'original.com' },
         clientIp: '192.168.1.1',
       },
-      mockFetch
+      mockClient
     );
 
     expect(response.statusCode).toBe(503);
@@ -936,7 +936,7 @@ describe('proxyRequest - Response Handling', () => {
 
 describe('proxyRequest - Hop-by-Hop Header Filtering', () => {
   it('should filter out Connection header from response', async () => {
-    const { mockFetch } = createMockFetch({
+    const { mockClient } = createMockHttpClient({
       status: 200,
       headers: {
         connection: 'keep-alive',
@@ -952,7 +952,7 @@ describe('proxyRequest - Hop-by-Hop Header Filtering', () => {
         headers: { host: 'original.com' },
         clientIp: '192.168.1.1',
       },
-      mockFetch
+      mockClient
     );
 
     expect(response.headers.get('connection')).toBeUndefined();
@@ -960,7 +960,7 @@ describe('proxyRequest - Hop-by-Hop Header Filtering', () => {
   });
 
   it('should filter out Keep-Alive header from response', async () => {
-    const { mockFetch } = createMockFetch({
+    const { mockClient } = createMockHttpClient({
       status: 200,
       headers: {
         'keep-alive': 'timeout=5',
@@ -976,14 +976,14 @@ describe('proxyRequest - Hop-by-Hop Header Filtering', () => {
         headers: { host: 'original.com' },
         clientIp: '192.168.1.1',
       },
-      mockFetch
+      mockClient
     );
 
     expect(response.headers.get('keep-alive')).toBeUndefined();
   });
 
   it('should filter out Transfer-Encoding header from response', async () => {
-    const { mockFetch } = createMockFetch({
+    const { mockClient } = createMockHttpClient({
       status: 200,
       headers: {
         'transfer-encoding': 'chunked',
@@ -999,14 +999,14 @@ describe('proxyRequest - Hop-by-Hop Header Filtering', () => {
         headers: { host: 'original.com' },
         clientIp: '192.168.1.1',
       },
-      mockFetch
+      mockClient
     );
 
     expect(response.headers.get('transfer-encoding')).toBeUndefined();
   });
 
   it('should filter out Upgrade header from response', async () => {
-    const { mockFetch } = createMockFetch({
+    const { mockClient } = createMockHttpClient({
       status: 200,
       headers: {
         upgrade: 'websocket',
@@ -1022,14 +1022,14 @@ describe('proxyRequest - Hop-by-Hop Header Filtering', () => {
         headers: { host: 'original.com' },
         clientIp: '192.168.1.1',
       },
-      mockFetch
+      mockClient
     );
 
     expect(response.headers.get('upgrade')).toBeUndefined();
   });
 
   it('should filter out Proxy-Authenticate header from response', async () => {
-    const { mockFetch } = createMockFetch({
+    const { mockClient } = createMockHttpClient({
       status: 407,
       headers: {
         'proxy-authenticate': 'Basic realm="proxy"',
@@ -1045,14 +1045,14 @@ describe('proxyRequest - Hop-by-Hop Header Filtering', () => {
         headers: { host: 'original.com' },
         clientIp: '192.168.1.1',
       },
-      mockFetch
+      mockClient
     );
 
     expect(response.headers.get('proxy-authenticate')).toBeUndefined();
   });
 
   it('should filter out Proxy-Authorization header from response', async () => {
-    const { mockFetch } = createMockFetch({
+    const { mockClient } = createMockHttpClient({
       status: 200,
       headers: {
         'proxy-authorization': 'Basic dXNlcjpwYXNz',
@@ -1068,14 +1068,14 @@ describe('proxyRequest - Hop-by-Hop Header Filtering', () => {
         headers: { host: 'original.com' },
         clientIp: '192.168.1.1',
       },
-      mockFetch
+      mockClient
     );
 
     expect(response.headers.get('proxy-authorization')).toBeUndefined();
   });
 
   it('should filter out TE header from response', async () => {
-    const { mockFetch } = createMockFetch({
+    const { mockClient } = createMockHttpClient({
       status: 200,
       headers: {
         te: 'trailers',
@@ -1091,14 +1091,14 @@ describe('proxyRequest - Hop-by-Hop Header Filtering', () => {
         headers: { host: 'original.com' },
         clientIp: '192.168.1.1',
       },
-      mockFetch
+      mockClient
     );
 
     expect(response.headers.get('te')).toBeUndefined();
   });
 
   it('should filter out Trailer header from response', async () => {
-    const { mockFetch } = createMockFetch({
+    const { mockClient } = createMockHttpClient({
       status: 200,
       headers: {
         trailer: 'content-length',
@@ -1114,14 +1114,14 @@ describe('proxyRequest - Hop-by-Hop Header Filtering', () => {
         headers: { host: 'original.com' },
         clientIp: '192.168.1.1',
       },
-      mockFetch
+      mockClient
     );
 
     expect(response.headers.get('trailer')).toBeUndefined();
   });
 
   it('should preserve end-to-end headers in response', async () => {
-    const { mockFetch } = createMockFetch({
+    const { mockClient } = createMockHttpClient({
       status: 200,
       headers: {
         'cache-control': 'max-age=3600',
@@ -1139,7 +1139,7 @@ describe('proxyRequest - Hop-by-Hop Header Filtering', () => {
         headers: { host: 'original.com' },
         clientIp: '192.168.1.1',
       },
-      mockFetch
+      mockClient
     );
 
     expect(response.headers.get('cache-control')).toBe('max-age=3600');
@@ -1155,7 +1155,7 @@ describe('proxyRequest - Hop-by-Hop Header Filtering', () => {
 
 describe('proxyRequest - URL and Path Handling', () => {
   it('should preserve query parameters in target URL', async () => {
-    const { mockFetch, capturedRequest } = createMockFetch({
+    const { mockClient, capturedRequest } = createMockHttpClient({
       status: 200,
       body: 'OK',
     });
@@ -1167,14 +1167,14 @@ describe('proxyRequest - URL and Path Handling', () => {
         headers: { host: 'original.com' },
         clientIp: '192.168.1.1',
       },
-      mockFetch
+      mockClient
     );
 
     expect(capturedRequest.url).toBe('http://target.com/api?foo=bar&baz=qux');
   });
 
   it('should handle path with special characters', async () => {
-    const { mockFetch, capturedRequest } = createMockFetch({
+    const { mockClient, capturedRequest } = createMockHttpClient({
       status: 200,
       body: 'OK',
     });
@@ -1186,14 +1186,14 @@ describe('proxyRequest - URL and Path Handling', () => {
         headers: { host: 'original.com' },
         clientIp: '192.168.1.1',
       },
-      mockFetch
+      mockClient
     );
 
     expect(capturedRequest.url).toBe('http://target.com/api/users/john%20doe');
   });
 
   it('should handle HTTPS URLs', async () => {
-    const { mockFetch, capturedRequest } = createMockFetch({
+    const { mockClient, capturedRequest } = createMockHttpClient({
       status: 200,
       body: 'OK',
     });
@@ -1205,7 +1205,7 @@ describe('proxyRequest - URL and Path Handling', () => {
         headers: { host: 'original.com' },
         clientIp: '192.168.1.1',
       },
-      mockFetch
+      mockClient
     );
 
     expect(capturedRequest.url).toBe('https://secure-target.com/api');
@@ -1213,7 +1213,7 @@ describe('proxyRequest - URL and Path Handling', () => {
   });
 
   it('should handle HTTPS URLs with port', async () => {
-    const { mockFetch, capturedRequest } = createMockFetch({
+    const { mockClient, capturedRequest } = createMockHttpClient({
       status: 200,
       body: 'OK',
     });
@@ -1225,7 +1225,7 @@ describe('proxyRequest - URL and Path Handling', () => {
         headers: { host: 'original.com' },
         clientIp: '192.168.1.1',
       },
-      mockFetch
+      mockClient
     );
 
     expect(capturedRequest.url).toBe('https://secure-target.com:8443/api');
@@ -1233,7 +1233,7 @@ describe('proxyRequest - URL and Path Handling', () => {
   });
 
   it('should handle URLs with authentication credentials', async () => {
-    const { mockFetch, capturedRequest } = createMockFetch({
+    const { mockClient, capturedRequest } = createMockHttpClient({
       status: 200,
       body: 'OK',
     });
@@ -1245,7 +1245,7 @@ describe('proxyRequest - URL and Path Handling', () => {
         headers: { host: 'original.com' },
         clientIp: '192.168.1.1',
       },
-      mockFetch
+      mockClient
     );
 
     expect(capturedRequest.url).toBe('http://user:pass@target.com/api');
@@ -1253,7 +1253,7 @@ describe('proxyRequest - URL and Path Handling', () => {
   });
 
   it('should handle URLs with fragments', async () => {
-    const { mockFetch, capturedRequest } = createMockFetch({
+    const { mockClient, capturedRequest } = createMockHttpClient({
       status: 200,
       body: 'OK',
     });
@@ -1265,7 +1265,7 @@ describe('proxyRequest - URL and Path Handling', () => {
         headers: { host: 'original.com' },
         clientIp: '192.168.1.1',
       },
-      mockFetch
+      mockClient
     );
 
     expect(capturedRequest.url).toBe('http://target.com/api#section');
@@ -1273,7 +1273,7 @@ describe('proxyRequest - URL and Path Handling', () => {
   });
 
   it('should handle complex URL paths', async () => {
-    const { mockFetch, capturedRequest } = createMockFetch({
+    const { mockClient, capturedRequest } = createMockHttpClient({
       status: 200,
       body: 'OK',
     });
@@ -1285,7 +1285,7 @@ describe('proxyRequest - URL and Path Handling', () => {
         headers: { host: 'original.com' },
         clientIp: '192.168.1.1',
       },
-      mockFetch
+      mockClient
     );
 
     expect(capturedRequest.url).toBe('http://target.com/api/v2/users/123/posts?filter=recent&limit=10');
@@ -1299,7 +1299,7 @@ describe('proxyRequest - URL and Path Handling', () => {
 
 describe('proxyRequest - Error Status Codes', () => {
   it('should handle 404 response', async () => {
-    const { mockFetch } = createMockFetch({
+    const { mockClient } = createMockHttpClient({
       status: 404,
       body: 'Not Found',
     });
@@ -1311,7 +1311,7 @@ describe('proxyRequest - Error Status Codes', () => {
         headers: { host: 'original.com' },
         clientIp: '192.168.1.1',
       },
-      mockFetch
+      mockClient
     );
 
     expect(response.statusCode).toBe(404);
@@ -1319,7 +1319,7 @@ describe('proxyRequest - Error Status Codes', () => {
   });
 
   it('should handle 500 response', async () => {
-    const { mockFetch } = createMockFetch({
+    const { mockClient } = createMockHttpClient({
       status: 500,
       body: 'Internal Server Error',
     });
@@ -1331,7 +1331,7 @@ describe('proxyRequest - Error Status Codes', () => {
         headers: { host: 'original.com' },
         clientIp: '192.168.1.1',
       },
-      mockFetch
+      mockClient
     );
 
     expect(response.statusCode).toBe(500);
@@ -1339,7 +1339,7 @@ describe('proxyRequest - Error Status Codes', () => {
   });
 
   it('should handle 302 redirect response', async () => {
-    const { mockFetch } = createMockFetch({
+    const { mockClient } = createMockHttpClient({
       status: 302,
       headers: {
         location: 'http://target.com/new-location',
@@ -1354,7 +1354,7 @@ describe('proxyRequest - Error Status Codes', () => {
         headers: { host: 'original.com' },
         clientIp: '192.168.1.1',
       },
-      mockFetch
+      mockClient
     );
 
     expect(response.statusCode).toBe(302);
@@ -1368,7 +1368,7 @@ describe('proxyRequest - Error Status Codes', () => {
 
 describe('proxyRequest - Error Handling', () => {
   it('should throw error for malformed target URL', async () => {
-    const { mockFetch } = createMockFetch({
+    const { mockClient } = createMockHttpClient({
       status: 200,
       body: 'OK',
     });
@@ -1381,13 +1381,13 @@ describe('proxyRequest - Error Handling', () => {
           headers: { host: 'original.com' },
           clientIp: '192.168.1.1',
         },
-        mockFetch
+        mockClient
       )
     ).rejects.toThrow();
   });
 
   it('should throw error for empty target URL', async () => {
-    const { mockFetch } = createMockFetch({
+    const { mockClient } = createMockHttpClient({
       status: 200,
       body: 'OK',
     });
@@ -1400,14 +1400,16 @@ describe('proxyRequest - Error Handling', () => {
           headers: { host: 'original.com' },
           clientIp: '192.168.1.1',
         },
-        mockFetch
+        mockClient
       )
     ).rejects.toThrow();
   });
 
-  it('should propagate fetch errors', async () => {
-    const mockFetchWithError: FetchFunction = async () => {
-      throw new Error('Network error');
+  it('should propagate client errors', async () => {
+    const mockClientWithError = {
+      async request() {
+        throw new Error('Network error');
+      }
     };
 
     await expect(
@@ -1418,14 +1420,16 @@ describe('proxyRequest - Error Handling', () => {
           headers: { host: 'original.com' },
           clientIp: '192.168.1.1',
         },
-        mockFetchWithError
+        mockClientWithError
       )
     ).rejects.toThrow('Network error');
   });
 
-  it('should handle fetch timeout errors', async () => {
-    const mockFetchWithTimeout: FetchFunction = async () => {
-      throw new Error('Timeout');
+  it('should handle client timeout errors', async () => {
+    const mockClientWithTimeout = {
+      async request() {
+        throw new Error('Timeout');
+      }
     };
 
     await expect(
@@ -1436,7 +1440,7 @@ describe('proxyRequest - Error Handling', () => {
           headers: { host: 'original.com' },
           clientIp: '192.168.1.1',
         },
-        mockFetchWithTimeout
+        mockClientWithTimeout
       )
     ).rejects.toThrow('Timeout');
   });
@@ -1448,7 +1452,7 @@ describe('proxyRequest - Error Handling', () => {
 
 describe('proxyRequest - Header Case Sensitivity', () => {
   it('should handle mixed-case header names in request', async () => {
-    const { mockFetch, capturedRequest } = createMockFetch({
+    const { mockClient, capturedRequest } = createMockHttpClient({
       status: 200,
       body: 'OK',
     });
@@ -1464,7 +1468,7 @@ describe('proxyRequest - Header Case Sensitivity', () => {
         },
         clientIp: '192.168.1.1',
       },
-      mockFetch
+      mockClient
     );
 
     expect(capturedRequest.headers['content-type']).toBe('application/json');
@@ -1473,7 +1477,7 @@ describe('proxyRequest - Header Case Sensitivity', () => {
   });
 
   it('should handle mixed-case X-Forwarded headers', async () => {
-    const { mockFetch, capturedRequest } = createMockFetch({
+    const { mockClient, capturedRequest } = createMockHttpClient({
       status: 200,
       body: 'OK',
     });
@@ -1489,7 +1493,7 @@ describe('proxyRequest - Header Case Sensitivity', () => {
         },
         clientIp: '192.168.1.1',
       },
-      mockFetch
+      mockClient
     );
 
     expect(capturedRequest.headers['x-forwarded-for']).toBe('10.0.0.1, 192.168.1.1');
@@ -1497,7 +1501,7 @@ describe('proxyRequest - Header Case Sensitivity', () => {
   });
 
   it('should preserve header case in response headers', async () => {
-    const { mockFetch } = createMockFetch({
+    const { mockClient } = createMockHttpClient({
       status: 200,
       headers: {
         'Content-Type': 'application/json',
@@ -1514,7 +1518,7 @@ describe('proxyRequest - Header Case Sensitivity', () => {
         headers: { host: 'original.com' },
         clientIp: '192.168.1.1',
       },
-      mockFetch
+      mockClient
     );
 
     expect(response.headers.get('content-type')).toBe('application/json');

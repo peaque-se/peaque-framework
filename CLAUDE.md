@@ -24,7 +24,7 @@ npm run prepublishOnly
 ### Core Components
 
 - **PeaqueFramework** (`src/framework.ts`): Main framework class that orchestrates the entire system
-  - Manages Fastify server, route discovery, build processes
+  - Manages a custom server, route discovery, build processes
   - Handles both development and production modes
   - Integrates with DevServer for HMR functionality
 

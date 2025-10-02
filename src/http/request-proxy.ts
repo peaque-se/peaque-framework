@@ -1,3 +1,6 @@
+import * as http from 'node:http'
+import * as https from 'node:https'
+
 export interface ProxyRequestData {
   method: string
   headers: Record<string, string | string[]>
@@ -11,20 +14,83 @@ export interface ProxyResponseData {
   body: Buffer
 }
 
-export type FetchFunction = typeof fetch
+/**
+ * HTTP client interface for making proxied requests
+ */
+export interface HttpClient {
+  request(url: string, options: {
+    method: string
+    headers: Record<string, string>
+    body?: Buffer
+  }): Promise<{
+    statusCode: number
+    headers: Record<string, string | string[] | undefined>
+    body: Buffer
+  }>
+}
+
+/**
+ * Native Node.js HTTP/HTTPS client (no auto-decompression)
+ */
+export class NativeHttpClient implements HttpClient {
+  async request(url: string, options: {
+    method: string
+    headers: Record<string, string>
+    body?: Buffer
+  }): Promise<{
+    statusCode: number
+    headers: Record<string, string | string[] | undefined>
+    body: Buffer
+  }> {
+    return new Promise((resolve, reject) => {
+      const parsedUrl = new URL(url);
+      const client = parsedUrl.protocol === 'https:' ? https : http;
+
+      const req = client.request(url, {
+        method: options.method,
+        headers: options.headers,
+      }, (res) => {
+        const chunks: Buffer[] = [];
+
+        res.on('data', (chunk: Buffer) => {
+          chunks.push(chunk);
+        });
+
+        res.on('end', () => {
+          resolve({
+            statusCode: res.statusCode ?? 500,
+            headers: res.headers,
+            body: Buffer.concat(chunks),
+          });
+        });
+
+        res.on('error', reject);
+      });
+
+      req.on('error', reject);
+
+      if (options.body && options.body.length > 0) {
+        req.write(options.body);
+      }
+
+      req.end();
+    });
+  }
+}
 
 /**
  * Proxies an HTTP request to a target URL, preserving all request data except the Host header.
  * Adds standard X-Forwarded-* headers and filters hop-by-hop response headers.
+ * Uses native http/https modules to avoid automatic decompression.
  *
  * @param targetUrl - The URL to proxy the request to
  * @param requestData - The original request data to forward
- * @param fetchFn - Optional fetch function for testing (defaults to global fetch)
+ * @param httpClient - HTTP client to use (defaults to NativeHttpClient)
  */
 export async function proxyRequest(
   targetUrl: string,
   requestData: ProxyRequestData,
-  fetchFn: FetchFunction = fetch
+  httpClient: HttpClient = new NativeHttpClient()
 ): Promise<ProxyResponseData> {
   // Parse the target URL to extract the host
   const url = new URL(targetUrl);
@@ -75,20 +141,11 @@ export async function proxyRequest(
     proxyHeaders['x-forwarded-proto'] = isHttps ? 'https' : 'http';
   }
 
-  // Prepare request body if present
-  let bodyToSend: BodyInit | null | undefined = undefined;
-  if (requestData.body && requestData.body.length > 0) {
-    // Node's Buffer is compatible with fetch's body, but needs explicit typing
-    bodyToSend = requestData.body as BodyInit;
-  }
-
   // Make the proxied request
-  const res = await fetchFn(targetUrl, {
+  const res = await httpClient.request(targetUrl, {
     method: requestData.method,
     headers: proxyHeaders,
-    body: bodyToSend,
-    // Important: don't let fetch auto-redirect, we want to preserve the response
-    redirect: 'manual',
+    body: requestData.body,
   });
 
   // Headers that should NOT be forwarded from the proxied response
@@ -105,21 +162,19 @@ export async function proxyRequest(
 
   // Copy response headers, filtering out hop-by-hop headers
   const responseHeaders = new Map<string, string>();
-  res.headers.forEach((value, name) => {
+  for (const [name, value] of Object.entries(res.headers)) {
     const lowerName = name.toLowerCase();
 
-    if (!skipHeaders.has(lowerName)) {
-      responseHeaders.set(name, value);
+    if (!skipHeaders.has(lowerName) && value !== undefined) {
+      // Join array values with comma (HTTP standard)
+      const headerValue = Array.isArray(value) ? value.join(', ') : String(value);
+      responseHeaders.set(name, headerValue);
     }
-  });
-
-  // Copy response body
-  const rawBody = await res.arrayBuffer();
-  const bodyBuffer = Buffer.from(rawBody);
+  }
 
   return {
-    statusCode: res.status,
+    statusCode: res.statusCode,
     headers: responseHeaders,
-    body: bodyBuffer,
+    body: res.body,
   };
 }

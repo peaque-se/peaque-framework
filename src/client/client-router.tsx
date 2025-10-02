@@ -8,7 +8,6 @@ export type GuardParameters = { path: string; params: Record<string, string>; pa
 export type PageGuard = (params: GuardParameters) => GuardResult
 export type PageMiddleware = (params: GuardParameters) => GuardResult
 
-
 export type RouterProps = {
   root: RouteNode
   loading?: ReactNode
@@ -17,70 +16,66 @@ export type RouterProps = {
   accessDenied?: ReactNode
 }
 
-const ParamsContext = createContext<Record<string, string>>({})
-export function useParams() {
-  return useContext(ParamsContext)
-}
+export type SearchParams = Record<string, string>
 
-export function useCurrentPath() {
-  const [path, setPath] = useState(() => window.location.pathname)
-
-  useEffect(() => {
-    const handlePop = () => setPath(window.location.pathname)
-    window.addEventListener("popstate", handlePop)
-    return () => window.removeEventListener("popstate", handlePop)
-  }, [])
-
-  return path
+export type Location = {
+  path: string
+  search: string
+  hash: string
+  searchParams: SearchParams
 }
 
 export type CurrentMatch = {
   pattern: string
   matches: (path: string) => boolean
+  path: string
   location: Location
   params: Record<string, string>
 }
+
 const CurrentMatchContext = createContext<CurrentMatch | null>(null)
+
 export function useCurrentMatch() {
   return useContext(CurrentMatchContext)
+}
+
+export function useParams(): Record<string, string> {
+  const match = useCurrentMatch()
+  if (!match) throw new Error("useParams must be used within a Router")
+  return match.params
+}
+
+export function useCurrentPath(): string {
+  const match = useCurrentMatch()
+  if (!match) throw new Error("useCurrentPath must be used within a Router")
+  return match.path
 }
 
 export function useNavigate() {
   const match = useCurrentMatch()
   if (!match) throw new Error("useNavigate must be used within a Router")
   return useCallback((path: string) => {
-    let href = path
-    if (href !== "/" && href.endsWith("/")) {
-      href = href.slice(0, -1)
-    }
-    navigate(href)
+    navigate(path)
   }, [])
 }
 
-export type SearchParams = {
-  [key: string]: string
-}
 export function useSearchParams(): SearchParams {
-  const params = new URLSearchParams(window.location.search)
-  const searchParams: SearchParams = {}
-  for (const [key, value] of params.entries()) {
-    searchParams[key] = value
-  }
-  return searchParams
+  const match = useCurrentMatch()
+  if (!match) throw new Error("useSearchParams must be used within a Router")
+  return match.location.searchParams
 }
+
 export function setSearchParam(key: string, value: string | number | boolean | null | undefined, reload = false) {
-  const params = new URLSearchParams(window.location.search)
+  const location = extractLocationFromWindow()
+  const params = {...location.searchParams}
   if (value === null || value === undefined) {
-    params.delete(key)
+    delete params[key]
   } else {
-    params.set(key, String(value))
+    params[key] = String(value)
   }
-  const paramString = params.toString()
-  const newUrl = `${window.location.pathname}${paramString ? `?${paramString}` : ""}`
-  window.history.replaceState({}, "", newUrl)
-  if (reload) {
-    window.dispatchEvent(new PopStateEvent("popstate"))
-  }
+  const newLocation = {...location, searchParams: params}
+  const newHref = locationToHref(newLocation)
+  navigate(newHref, { replace: !reload })
 }
 
 function matchPath(pattern: string, path: string): Record<string, string> | null {
@@ -114,7 +109,7 @@ type MatchResult = {
 export function findMatch(root: RouteNode, path: string): MatchResult | null {
   const m = match(path, root)
   if (!m) return null
-  const result : MatchResult = {
+  const result: MatchResult = {
     component: m.names.page as React.ComponentType<any>,
     pattern: m.pattern,
     layouts: (m.stacks.layout || []) as React.ComponentType<any>[],
@@ -126,18 +121,27 @@ export function findMatch(root: RouteNode, path: string): MatchResult | null {
   return result
 }
 
-export function navigate(path: string) {
+export function navigate(path: string, options : { replace?: boolean } = { replace: false }) {
+  // normalize path by removing trailing slash (except for root)
+  let href = path
+  if (href !== "/" && href.endsWith("/")) {
+    href = href.slice(0, -1)
+  }
+
   // Save current scroll position before navigating
   const scrollPos = { x: window.scrollX, y: window.scrollY }
   window.history.replaceState({ ...window.history.state, scrollPos }, "")
 
-  window.history.pushState({ scrollPos: { x: 0, y: 0 } }, "", path)
+  if (options.replace) {
+    window.history.replaceState({ scrollPos: { x: 0, y: 0 } }, "", href)
+  } else {
+    window.history.pushState({ scrollPos: { x: 0, y: 0 } }, "", href)
+  }
   window.dispatchEvent(new PopStateEvent("popstate"))
 }
 
 export function redirect(path: string) {
-  window.history.replaceState({ scrollPos: { x: 0, y: 0 } }, "", path)
-  window.dispatchEvent(new PopStateEvent("popstate"))
+  navigate(path, { replace: true })
 }
 
 function Navigate({ to }: { to: string }) {
@@ -153,7 +157,7 @@ type LinkProps = {
 } & Omit<React.AnchorHTMLAttributes<HTMLAnchorElement>, "href">
 
 export function Link({ to, children, className, onClick, ...rest }: LinkProps) {
-  const href = (to !== "/" && to.endsWith("/")) ? to.slice(0, -1) : to
+  const href = to !== "/" && to.endsWith("/") ? to.slice(0, -1) : to
   const handleClick = (e: React.MouseEvent) => {
     if (e.button === 0 && !e.ctrlKey && !e.shiftKey && !e.altKey && !e.metaKey) {
       e.preventDefault()
@@ -161,7 +165,11 @@ export function Link({ to, children, className, onClick, ...rest }: LinkProps) {
     }
     onClick?.(e as any)
   }
-  return (<a href={href} onClick={handleClick} className={className} {...rest}>{children}</a>)
+  return (
+    <a href={href} onClick={handleClick} className={className} {...rest}>
+      {children}
+    </a>
+  )
 }
 
 class ErrorBoundary extends Component<{ children: ReactNode; fallback: ReactElement; resetKeys?: any[] }, { hasError: boolean }> {
@@ -236,19 +244,25 @@ export function NavLink({ to, className, children, ...rest }: NavLinkProps) {
   )
 }
 
-type Location = {
-  path: string
-  search: string
-  hash: string
-}
-
 function extractLocationFromWindow(): Location {
+  const searchParams = new URLSearchParams(window.location.search)
+  const paramsObj: SearchParams = {}
+  searchParams.forEach((value, key) => {
+    paramsObj[key] = value
+  })
   return {
     path: window.location.pathname,
     search: window.location.search,
     hash: window.location.hash,
+    searchParams: paramsObj,
   }
 }
+
+function locationToHref(location: Location): string {
+  const params = new URLSearchParams(location.searchParams).toString()
+  return `${location.path}${params ? `?${params}` : ""}${location.hash}`
+}
+
 
 export function Router({ root, loading = <div>Loading...</div>, missing = <div>404 Not Found</div>, error = <ErrorPanel />, accessDenied = <div>Access Denied</div> }: RouterProps): ReactElement {
   const [location, setLocation] = useState(() => extractLocationFromWindow())
@@ -386,9 +400,5 @@ export function Router({ root, loading = <div>Loading...</div>, missing = <div>4
     </ErrorBoundary>
   )
 
-  return (
-    <CurrentMatchContext.Provider value={{ params, pattern, location, matches: (path) => matchPath(pattern, path) != null }}>
-      <ParamsContext.Provider value={params}>{content}</ParamsContext.Provider>
-    </CurrentMatchContext.Provider>
-  )
+  return <CurrentMatchContext.Provider value={{ params, path: location.path, pattern, location, matches: (path) => matchPath(pattern, path) != null }}>{content}</CurrentMatchContext.Provider>
 }

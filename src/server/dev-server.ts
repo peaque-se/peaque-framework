@@ -379,8 +379,8 @@ export class DevServer {
 
     try {
       const srcContent = readFileSync(fullPath, "utf-8")
-      const fastifyContent = fastRefreshify(srcContent, srcPath)
-      const processedContents = makeImportsRelative(fastifyContent, fullPath.substring(this.basePath.length + 1))
+      const refreshifyContent = fastRefreshify(srcContent, srcPath)
+      const processedContents = makeImportsRelative(refreshifyContent, fullPath.substring(this.basePath.length + 1))
       req.type("application/javascript").send(processedContents)
     } catch (err) {
       const errorContents = `console.error("Error loading module ${srcPath}:", ${JSON.stringify(err instanceof Error ? err.message : String(err))})\n
@@ -443,8 +443,8 @@ export class DevServer {
     result.push(`}`)
 
     const js = result.join("\n")
-    const fastifyContent = fastRefreshify(js, "peaque.tsx")
-    const processedContents = makeImportsRelative(fastifyContent)
+    const refreshifyContent = fastRefreshify(js, "peaque.tsx")
+    const processedContents = makeImportsRelative(refreshifyContent)
 
     req.type("application/javascript").send(processedContents)
   }
@@ -454,8 +454,8 @@ export class DevServer {
           import { createRoot } from 'react-dom/client';
           import MainApplication from './peaque.js';
           createRoot(document.getElementById('peaque')!).render(<MainApplication />);`
-    const fastifyContent = fastRefreshify(loaderContent, "peaque-loader.js")
-    const processedContents = makeImportsRelative(fastifyContent).replace("/@src/peaque", "/peaque.js")
+    const refreshifyContent = fastRefreshify(loaderContent, "peaque-loader.js")
+    const processedContents = makeImportsRelative(refreshifyContent).replace("/@src/peaque", "/peaque.js")
     // set the content type to application/javascript
     req.type("application/javascript").send(processedContents)
   }
