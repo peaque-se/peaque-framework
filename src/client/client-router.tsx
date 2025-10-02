@@ -37,7 +37,7 @@ export function useCurrentPath() {
 export type CurrentMatch = {
   pattern: string
   matches: (path: string) => boolean
-  path: string
+  location: Location
   params: Record<string, string>
 }
 const CurrentMatchContext = createContext<CurrentMatch | null>(null)
@@ -223,9 +223,9 @@ export function NavLink({ to, className, children, ...rest }: NavLinkProps) {
   let isActive = false
   if (match) {
     if (to === "/") {
-      isActive = match.path === "/"
+      isActive = match.location.path === "/"
     } else {
-      isActive = match.path === href || match.path.startsWith(href + "/")
+      isActive = match.location.path === href || match.location.path.startsWith(href + "/")
     }
   }
 
@@ -236,8 +236,22 @@ export function NavLink({ to, className, children, ...rest }: NavLinkProps) {
   )
 }
 
+type Location = {
+  path: string
+  search: string
+  hash: string
+}
+
+function extractLocationFromWindow(): Location {
+  return {
+    path: window.location.pathname,
+    search: window.location.search,
+    hash: window.location.hash,
+  }
+}
+
 export function Router({ root, loading = <div>Loading...</div>, missing = <div>404 Not Found</div>, error = <ErrorPanel />, accessDenied = <div>Access Denied</div> }: RouterProps): ReactElement {
-  const [path, setPath] = useState(() => window.location.pathname)
+  const [location, setLocation] = useState(() => extractLocationFromWindow())
   const [guardState, setGuardState] = useState<{
     status: "pending" | "allowed" | "redirect" | "denied" | "404"
     match?: MatchResult
@@ -250,7 +264,7 @@ export function Router({ root, loading = <div>Loading...</div>, missing = <div>4
       window.history.scrollRestoration = "manual"
     }
 
-    const handlePop = () => setPath(window.location.pathname)
+    const handlePop = () => setLocation(extractLocationFromWindow())
     window.addEventListener("popstate", handlePop)
 
     // Continuously update scroll position in history state
@@ -272,7 +286,7 @@ export function Router({ root, loading = <div>Loading...</div>, missing = <div>4
   }, [])
 
   useEffect(() => {
-    const match = findMatch(root, path)
+    const match = findMatch(root, location.path)
     if (!match) {
       setGuardState({ status: "404" })
       return
@@ -283,7 +297,7 @@ export function Router({ root, loading = <div>Loading...</div>, missing = <div>4
       for (const guard of match.guards) {
         try {
           const result = await guard({
-            path,
+            path: location.path,
             params: match.params,
             pattern: match.pattern,
           })
@@ -306,7 +320,7 @@ export function Router({ root, loading = <div>Loading...</div>, missing = <div>4
       for (const middleware of match.middleware) {
         try {
           const result = await middleware({
-            path,
+            path: location.path,
             params: match.params,
             pattern: match.pattern,
           })
@@ -330,7 +344,7 @@ export function Router({ root, loading = <div>Loading...</div>, missing = <div>4
 
     setGuardState({ status: "pending" })
     runGuards()
-  }, [path, root])
+  }, [location, root])
 
   // Handle scroll position after navigation
   useEffect(() => {
@@ -367,13 +381,13 @@ export function Router({ root, loading = <div>Loading...</div>, missing = <div>4
   document.title = heads.filter((h) => h.title).at(-1)?.title || "Peaque App"
   const content = layouts.reduceRight(
     (child, Layout) => <Layout>{child}</Layout>,
-    <ErrorBoundary fallback={<>{error}</>} resetKeys={[path]}>
+    <ErrorBoundary fallback={<>{error}</>} resetKeys={[location]}>
       <Component {...params} />
     </ErrorBoundary>
   )
 
   return (
-    <CurrentMatchContext.Provider value={{ params, pattern, path, matches: (path) => matchPath(pattern, path) != null }}>
+    <CurrentMatchContext.Provider value={{ params, pattern, location, matches: (path) => matchPath(pattern, path) != null }}>
       <ParamsContext.Provider value={params}>{content}</ParamsContext.Provider>
     </CurrentMatchContext.Provider>
   )
