@@ -501,8 +501,11 @@ export const buildForProduction = async (basePath: string, distFolder: string, m
   const newCssContent = await bundleCssFile(cssContent, basePath)
   fs.writeFileSync(path.join(assetDir, "peaque.css"), newCssContent, "utf-8")
 
-  // Copy public folder
-  await fs.promises.cp(path.join(basePath, "src/public"), assetDir, { recursive: true })
+  // Copy public folder if it exists
+  const publicFolder = path.join(basePath, "src/public")
+  if (fs.existsSync(publicFolder)) {
+    await fs.promises.cp(publicFolder, assetDir, { recursive: true })
+  }
 
   // Precompress assets
   await precompressAssets(assetDir)
@@ -510,8 +513,11 @@ export const buildForProduction = async (basePath: string, distFolder: string, m
   // Extract head stacks from frontend router
   const headStacks = await extractHeadStacks(frontend, basePath, basePath + "/src/pages")
 
-  // Build backend router
-  const backend = buildRouter(basePath + "/src/api", apiRouterConfig) as RouteNode<string>
+  // Build backend router (if api folder exists)
+  const apiFolder = path.join(basePath, "src/api")
+  const backend = fs.existsSync(apiFolder)
+    ? buildRouter(apiFolder, apiRouterConfig) as RouteNode<string>
+    : { staticChildren: new Map(), accept: false, names: {}, stacks: {} } as RouteNode<string>
 
   // Generate backend server code
   const backendCode = generateBackendServerCode(backend, headStacks, frontend, basePath)

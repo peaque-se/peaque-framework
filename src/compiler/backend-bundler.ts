@@ -152,7 +152,7 @@ export async function bundleBackendProgram(options: BackendBundleOptions): Promi
       treeShaking: true,
       // Generate metafile for analysis
       metafile: true,
-      plugins: [excludeDevModulesPlugin(), frameworkDepsPlugin(["croner", "react-refresh", "react", "react-dom", "tailwindcss"])],
+      plugins: [excludeDevModulesPlugin(), frameworkDepsPlugin(["croner", "react-refresh", "react", "react-dom", "tailwindcss", "dotenv"])],
     } // Run esbuild
     const result = await esbuild.build(esbuildOptions)
 
