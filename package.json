@@ -12,6 +12,58 @@
     "./server": {
       "import": "./dist/http/index.js",
       "types": "./dist/http/index.d.ts"
+    },
+    "./utils/logger": {
+      "import": "./dist/utils/logger.js",
+      "types": "./dist/utils/logger.d.ts"
+    },
+    "./utils/validation": {
+      "import": "./dist/utils/validation.js",
+      "types": "./dist/utils/validation.d.ts"
+    },
+    "./utils/async": {
+      "import": "./dist/utils/async.js",
+      "types": "./dist/utils/async.d.ts"
+    },
+    "./utils/async-advanced": {
+      "import": "./dist/utils/async-advanced.js",
+      "types": "./dist/utils/async-advanced.d.ts"
+    },
+    "./utils/performance": {
+      "import": "./dist/utils/performance.js",
+      "types": "./dist/utils/performance.d.ts"
+    },
+    "./utils/cache": {
+      "import": "./dist/utils/cache.js",
+      "types": "./dist/utils/cache.d.ts"
+    },
+    "./utils/env": {
+      "import": "./dist/utils/env.js",
+      "types": "./dist/utils/env.d.ts"
+    },
+    "./utils/testing": {
+      "import": "./dist/utils/testing.js",
+      "types": "./dist/utils/testing.d.ts"
+    },
+    "./utils/data": {
+      "import": "./dist/utils/data.js",
+      "types": "./dist/utils/data.d.ts"
+    },
+    "./utils/security": {
+      "import": "./dist/utils/security.js",
+      "types": "./dist/utils/security.d.ts"
+    },
+    "./utils/string": {
+      "import": "./dist/utils/string.js",
+      "types": "./dist/utils/string.d.ts"
+    },
+    "./utils/file": {
+      "import": "./dist/utils/file.js",
+      "types": "./dist/utils/file.d.ts"
+    },
+    "./utils/http-client": {
+      "import": "./dist/utils/http-client.js",
+      "types": "./dist/utils/http-client.d.ts"
     }
   },
   "bin": {
