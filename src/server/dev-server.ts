@@ -485,7 +485,7 @@ export class DevServer {
         const css = await (await fetch(url)).text()
         await sheet.replace(css)
       }
-      replaceStylesheet("/style.css")
+      replaceStylesheet("/peaque.css")
       window.replaceStylesheet = replaceStylesheet
 if (typeof window !== 'undefined') {
   let reconnectAttempts = 0;
