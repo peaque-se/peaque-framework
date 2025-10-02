@@ -335,9 +335,11 @@ function generateBackendServerCode(apiRouter: RouteNode<string>, headStacks: Map
 
   // Check for startup and middleware
   let startupImport = ""
+  let startupReference = ""
   let rootMiddleware = ""
   if (fs.existsSync(path.join(basePath, "src", "startup.ts"))) {
-    startupImport = `import * as ThrowawayStartup from "../src/startup.ts"`
+    startupImport = `import * as StartupModule from "../src/startup.ts"`
+    startupReference = `  // Ensure startup module is loaded for side effects\n  StartupModule`
   }
   if (fs.existsSync(path.join(basePath, "src", "middleware.ts"))) {
     rootMiddleware = `import { middleware as AbsoluteRootMiddleware } from "../src/middleware.ts"`
@@ -424,6 +426,7 @@ function generateBackendServerCode(apiRouter: RouteNode<string>, headStacks: Map
   // Generate main startup function
   const startupFunction = [
     "async function main() {",
+    startupReference ? startupReference + ";" : "",
     "  const args = process.argv.slice(1)",
     '  const portIndex = args.findIndex(arg => arg === "-p" || arg === "--port")',
     "  const port = portIndex !== -1 && args.length > portIndex + 1 ? parseInt(args[portIndex + 1], 10) : 3000",
@@ -454,7 +457,7 @@ function generateBackendServerCode(apiRouter: RouteNode<string>, headStacks: Map
   return [...imports, "", ...htmlConstants, "", jobsFunction, ...routerFunction, "", ...startupFunction].join("\n")
 }
 
-export const buildForProduction = async (basePath: string, distFolder: string) => {
+export const buildForProduction = async (basePath: string, distFolder: string, minify: boolean) => {
   const startTime = Date.now()
   console.log(`📦  ${colors.bold(colors.yellow("Peaque Framework " + platformVersion))} building for production`)
   console.log(`     ${colors.green("✓")} Base path ${colors.gray(`${basePath}`)}`)
@@ -518,7 +521,7 @@ export const buildForProduction = async (basePath: string, distFolder: string) =
     baseDir: theoreticalDistFolder,
     outfile: path.join(outDir, "server_without_env.cjs"),
     inputContent: backendCode,
-    minify: false,
+    minify,
     sourcemap: false,
   })
 
@@ -534,7 +537,7 @@ require("${pathToOutputFromTheoretical == "" ? "." : pathToOutputFromTheoretical
     baseDir: theoreticalDistFolder,
     outfile: path.join(outDir, "main.cjs"),
     inputContent: mainJs,
-    minify: false,
+    minify,
     sourcemap: false,
   })
 

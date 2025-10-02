@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { spawn } from "child_process"
-import { Command } from "commander"
+import { Command, Option } from "commander"
 import fs from "fs"
 import path from "path"
 import { buildForProduction } from "../compiler/prod-builder.js"
@@ -39,9 +39,11 @@ program
   .description("Build the application for production")
   .option("-o, --output <output>", "specify the output directory (default: ./dist)")
   .option("-b, --base <path>", "load project from other base path (default: current directory)")
+  .addOption(new Option("--no-minify", "disable code minification").hideHelp())
   .action(function () {
     const basePath = this.opts().base || process.cwd()
-    buildForProduction(basePath, this.opts().output || path.join(basePath, "dist"))
+    const minify = this.opts().minify !== false
+    buildForProduction(basePath, this.opts().output || path.join(basePath, "dist"), minify)
       .then(() => {
         process.exit(0)
       })
