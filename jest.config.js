@@ -23,5 +23,8 @@ export default {
       }
     }]
   },
+  transformIgnorePatterns: [
+    'node_modules/(?!(yoctocolors)/)'
+  ],
   moduleFileExtensions: ['ts', 'js', 'json']
 };

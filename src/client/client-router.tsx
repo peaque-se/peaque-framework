@@ -1,7 +1,8 @@
-import { createContext, useContext, useEffect, useState, Component, useCallback } from "react"
 import type { ReactElement, ReactNode } from "react"
-import type { HeadDefinition } from "./head.js"
+import { Component, useCallback, useEffect } from "react"
 import { match, RouteNode } from "../router/router.js"
+import type { HeadDefinition } from "./head.js"
+import { useRouterResult } from "./useRouterResult.js"
 
 export type GuardResult = boolean | string | Promise<boolean | string>
 export type GuardParameters = { path: string; params: Record<string, string>; pattern: string }
@@ -33,10 +34,10 @@ export type CurrentMatch = {
   params: Record<string, string>
 }
 
-const CurrentMatchContext = createContext<CurrentMatch | null>(null)
+// const CurrentMatchContext = createContext<CurrentMatch | null>(null)
 
 export function useCurrentMatch() {
-  return useContext(CurrentMatchContext)
+  return useRouterResult().match
 }
 
 export function useParams(): Record<string, string> {
@@ -67,18 +68,18 @@ export function useSearchParams(): SearchParams {
 
 export function setSearchParam(key: string, value: string | number | boolean | null | undefined, reload = false) {
   const location = extractLocationFromWindow()
-  const params = {...location.searchParams}
+  const params = { ...location.searchParams }
   if (value === null || value === undefined) {
     delete params[key]
   } else {
     params[key] = String(value)
   }
-  const newLocation = {...location, searchParams: params}
+  const newLocation = { ...location, searchParams: params }
   const newHref = locationToHref(newLocation)
   navigate(newHref, { replace: !reload })
 }
 
-function matchPath(pattern: string, path: string): Record<string, string> | null {
+export function matchPath(pattern: string, path: string): Record<string, string> | null {
   const patternParts = pattern.split("/").filter(Boolean)
   const pathParts = path.split("/").filter(Boolean)
 
@@ -121,7 +122,7 @@ export function findMatch(root: RouteNode, path: string): MatchResult | null {
   return result
 }
 
-export function navigate(path: string, options : { replace?: boolean } = { replace: false }) {
+export function navigate(path: string, options: { replace?: boolean } = { replace: false }) {
   // normalize path by removing trailing slash (except for root)
   let href = path
   if (href !== "/" && href.endsWith("/")) {
@@ -172,7 +173,7 @@ export function Link({ to, children, className, onClick, ...rest }: LinkProps) {
   )
 }
 
-class ErrorBoundary extends Component<{ children: ReactNode; fallback: ReactElement; resetKeys?: any[] }, { hasError: boolean }> {
+class ErrorBoundary extends Component<{ children: ReactNode; fallback: ReactElement; resetKey: string }, { hasError: boolean }> {
   constructor(props: any) {
     super(props)
     this.state = { hasError: false }
@@ -187,8 +188,8 @@ class ErrorBoundary extends Component<{ children: ReactNode; fallback: ReactElem
   }
 
   componentDidUpdate(prevProps: any) {
-    if (this.props.resetKeys && prevProps.resetKeys) {
-      const resetKeysDifferent = this.props.resetKeys.some((key, index) => key !== prevProps.resetKeys[index])
+    if (this.props.resetKey && prevProps.resetKey) {
+      const resetKeysDifferent = this.props.resetKey !== prevProps.resetKey
       if (resetKeysDifferent && this.state.hasError) {
         this.setState({ hasError: false })
       }
@@ -244,18 +245,27 @@ export function NavLink({ to, className, children, ...rest }: NavLinkProps) {
   )
 }
 
+const locationCache = new Map<string, Location>()
+
 function extractLocationFromWindow(): Location {
+  const href = window.location.href
+  if (locationCache.has(href)) {
+    return locationCache.get(href)!
+  }
+
   const searchParams = new URLSearchParams(window.location.search)
   const paramsObj: SearchParams = {}
   searchParams.forEach((value, key) => {
     paramsObj[key] = value
   })
-  return {
+  const location = {
     path: window.location.pathname,
     search: window.location.search,
     hash: window.location.hash,
     searchParams: paramsObj,
   }
+  locationCache.set(href, location)
+  return location
 }
 
 function locationToHref(location: Location): string {
@@ -263,142 +273,38 @@ function locationToHref(location: Location): string {
   return `${location.path}${params ? `?${params}` : ""}${location.hash}`
 }
 
-
 export function Router({ root, loading = <div>Loading...</div>, missing = <div>404 Not Found</div>, error = <ErrorPanel />, accessDenied = <div>Access Denied</div> }: RouterProps): ReactElement {
-  const [location, setLocation] = useState(() => extractLocationFromWindow())
-  const [guardState, setGuardState] = useState<{
-    status: "pending" | "allowed" | "redirect" | "denied" | "404"
-    match?: MatchResult
-    target?: string
-  }>({ status: "pending" })
+  const res = useRouterResult(root)
 
-  useEffect(() => {
-    // Take manual control of scroll restoration
-    if (window.history.scrollRestoration) {
-      window.history.scrollRestoration = "manual"
-    }
+  if (res.status === "pending") {
+    return <>{loading}</>
+  }
+  if (res.status === "404") {
+    return <>{missing}</>
+  }
+  if (res.status === "denied") {
+    return <>{accessDenied}</>
+  }
+  if (res.status === "redirect") {
+    return <Navigate to={res.match?.path || "/"} />
+  }
+  if (res.match === null) {
+    return <>{missing}</>
+  }
 
-    const handlePop = () => setLocation(extractLocationFromWindow())
-    window.addEventListener("popstate", handlePop)
+  if (res.title) document.title = res.title
 
-    // Continuously update scroll position in history state
-    let scrollTimeout: NodeJS.Timeout | null = null
-    const handleScroll = () => {
-      if (scrollTimeout) clearTimeout(scrollTimeout)
-      scrollTimeout = setTimeout(() => {
-        const scrollPos = { x: window.scrollX, y: window.scrollY }
-        window.history.replaceState({ ...window.history.state, scrollPos }, "")
-      }, 100)
-    }
-    window.addEventListener("scroll", handleScroll)
+  // render the matched component within the layout hierarchy
+  const Component = res.content!
+  const layouts = res.layouts || []
+  const params = res.match.params || {}
 
-    return () => {
-      window.removeEventListener("popstate", handlePop)
-      window.removeEventListener("scroll", handleScroll)
-      if (scrollTimeout) clearTimeout(scrollTimeout)
-    }
-  }, [])
-
-  useEffect(() => {
-    const match = findMatch(root, location.path)
-    if (!match) {
-      setGuardState({ status: "404" })
-      return
-    }
-
-    const runGuards = async () => {
-      // Execute stackable guards first (auth checks, etc.)
-      for (const guard of match.guards) {
-        try {
-          const result = await guard({
-            path: location.path,
-            params: match.params,
-            pattern: match.pattern,
-          })
-          if (result === true) {
-            continue
-          } else if (typeof result === "string") {
-            setGuardState({ status: "redirect", target: result })
-            return
-          } else {
-            setGuardState({ status: "denied" })
-            return
-          }
-        } catch {
-          setGuardState({ status: "denied" })
-          return
-        }
-      }
-
-      // Execute non-stackable middleware (parameter validation, etc.)
-      for (const middleware of match.middleware) {
-        try {
-          const result = await middleware({
-            path: location.path,
-            params: match.params,
-            pattern: match.pattern,
-          })
-          if (result === true) {
-            continue
-          } else if (typeof result === "string") {
-            setGuardState({ status: "redirect", target: result })
-            return
-          } else {
-            setGuardState({ status: "denied" })
-            return
-          }
-        } catch {
-          setGuardState({ status: "denied" })
-          return
-        }
-      }
-
-      setGuardState({ status: "allowed", match })
-    }
-
-    setGuardState({ status: "pending" })
-    runGuards()
-  }, [location, root])
-
-  // Handle scroll position after navigation
-  useEffect(() => {
-    if (guardState.status === "allowed") {
-      const scrollPos = window.history.state?.scrollPos
-      const currentScrollY = window.scrollY
-
-      // Wait for content to render and async data to load
-      const timeoutId = setTimeout(() => {
-        // Only scroll if user hasn't scrolled yet (avoid jarring jumps)
-        if (Math.abs(window.scrollY - currentScrollY) < 50) {
-          if (scrollPos) {
-            // Restore saved scroll position (back/forward navigation)
-            window.scrollTo(scrollPos.x, scrollPos.y)
-          } else {
-            // Scroll to top (new navigation)
-            window.scrollTo(0, 0)
-          }
-        }
-      }, 50)
-
-      return () => clearTimeout(timeoutId)
-    }
-  }, [guardState])
-
-  if (guardState.status === "404") return <>{missing}</>
-  if (guardState.status === "pending") return <>{loading}</>
-  if (guardState.status === "redirect") return <Navigate to={guardState.target!} />
-  if (guardState.status === "denied") return <>{accessDenied}</>
-
-  if (!guardState.match) return <>{missing}</>
-
-  const { component: Component, layouts, params, pattern, heads } = guardState.match
-  document.title = heads.filter((h) => h.title).at(-1)?.title || "Peaque App"
   const content = layouts.reduceRight(
     (child, Layout) => <Layout>{child}</Layout>,
-    <ErrorBoundary fallback={<>{error}</>} resetKeys={[location]}>
+    <ErrorBoundary fallback={<>{error}</>} resetKey={res.match!.path}>
       <Component {...params} />
     </ErrorBoundary>
   )
 
-  return <CurrentMatchContext.Provider value={{ params, path: location.path, pattern, location, matches: (path) => matchPath(pattern, path) != null }}>{content}</CurrentMatchContext.Provider>
+  return <>{content}</>
 }
